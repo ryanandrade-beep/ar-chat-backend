@@ -8,7 +8,7 @@ DOCS="$(dirname "$AQUI")"
 cd "$AQUI/diagramas"
 # PNG (visualização e reserva) e SVG (vetorial, usado no documento para manter a nitidez)
 for FMT in png svg; do
-  java -Djava.awt.headless=true -jar "$JAR" -t$FMT -Sdpi=200 -o "$DOCS/03-diagramas" 0[1-8]*-*.puml
-  java -Djava.awt.headless=true -jar "$JAR" -t$FMT -Sdpi=200 -o "$DOCS/04-prototipos" 09-*.puml 10-*.puml 11-*.puml
+  java -Djava.awt.headless=true -DPLANTUML_LIMIT_SIZE=16384 -jar "$JAR" -t$FMT -Sdpi=200 -o "$DOCS/03-diagramas" 0[1-8]*-*.puml
+  java -Djava.awt.headless=true -DPLANTUML_LIMIT_SIZE=16384 -jar "$JAR" -t$FMT -Sdpi=200 -o "$DOCS/04-prototipos" 09-*.puml 10-*.puml 11-*.puml
 done
 echo "Diagramas gerados em 03-diagramas e 04-prototipos"

@@ -4,6 +4,18 @@
 title Diagrama de Entidade e Relacionamento — A&R Chat
 hide circle
 skinparam linetype ortho
+entity conta_acesso {
+  * cliente_id : uuid <<PK, FK>>
+  --
+  * email : varchar(160) <<UK>>
+  * telefone : varchar(13)
+  * senha_hash : varchar(100)
+  * versao_termos : varchar(20)
+  * termos_aceitos_em : timestamptz
+  codigo_hash : varchar(100)
+  codigo_expira_em : timestamptz
+  * tentativas_codigo : integer
+}
 entity cliente {
   * id : uuid <<PK>>
   --
@@ -32,6 +44,9 @@ entity campanha {
   * cliente_id : uuid <<FK>>
   * nome : varchar(120)
   * conteudo : text
+  tipo_midia : varchar(10)
+  url_midia : varchar(2048)
+  nome_arquivo : varchar(255)
   * prioridade : varchar(10)
   * total_destinatarios : integer
   * custo_total : numeric(12,2)
@@ -46,6 +61,10 @@ entity conversa {
   data_ultima_mensagem : timestamptz
   * nao_lidas : integer
   * status_atendimento : varchar(12)
+  operador_id : uuid <<FK>>
+  departamento_id : uuid <<FK>>
+  * aguardando_ura : boolean
+  * tentativas_ura : integer
 }
 entity mensagem {
   * id : uuid <<PK>>
@@ -54,6 +73,9 @@ entity mensagem {
   campanha_id : uuid <<FK>>
   * remetente_tipo : varchar(12)
   * conteudo : text
+  tipo_midia : varchar(10)
+  url_midia : varchar(2048)
+  nome_arquivo : varchar(255)
   * prioridade : varchar(10)
   * status : varchar(12)
   * custo : numeric(5,2)
@@ -61,6 +83,11 @@ entity mensagem {
   id_externo : varchar(100) <<UK>>
   * criada_em : timestamptz
   atualizada_em : timestamptz
+  * automatica : boolean
+  * interna : boolean
+  operador_id : uuid <<FK>>
+  contato_nome : varchar(120)
+  contato_telefone : varchar(20)
 }
 entity transacao {
   * id : uuid <<PK>>
@@ -90,8 +117,82 @@ entity administrador {
   --
   * nome : varchar(120)
   * login : varchar(50) <<UK>>
+  email : varchar(160) <<UK>>
+  telefone : varchar(13)
   * senha_hash : varchar(255)
 }
+entity operador {
+  * id : uuid <<PK>>
+  --
+  * cliente_id : uuid <<FK>>
+  * nome : varchar(120)
+  * email : varchar(160) <<UK>>
+  * senha_hash : varchar(100)
+  * ativo : boolean
+  * dono : boolean
+  * criado_em : timestamptz
+}
+entity conversa_participante {
+  * conversa_id : uuid <<PK, FK>>
+  * operador_id : uuid <<PK, FK>>
+  --
+  * desde : timestamptz
+}
+entity plano {
+  * id : uuid <<PK>>
+  --
+  * nome : varchar(60) <<UK>>
+  * mensalidade : numeric(10,2)
+  * operadores_incluidos : integer
+  * preco_normal : numeric(5,2)
+  * preco_urgente : numeric(5,2)
+  * ativo : boolean
+  * criado_em : timestamptz
+}
+entity assinatura {
+  * cliente_id : uuid <<PK, FK>>
+  --
+  * plano_id : uuid <<FK>>
+  * situacao : varchar(10)
+  * inicio : timestamptz
+  ultima_cobranca : timestamptz
+}
+entity departamento {
+  * id : uuid <<PK>>
+  --
+  * cliente_id : uuid <<FK>>
+  * nome : varchar(60)
+  * ativo : boolean
+  * criado_em : timestamptz
+}
+entity configuracao_ura {
+  * cliente_id : uuid <<PK, FK>>
+  --
+  * ativa : boolean
+  * mensagem_boas_vindas : varchar(1000)
+  * mensagem_pergunta : varchar(1000)
+  * maximo_tentativas : integer
+  departamento_padrao_id : uuid <<FK>>
+  * ignorar_grupos : boolean
+}
+entity arquivo {
+  * id : uuid <<PK>>
+  --
+  * cliente_id : uuid <<FK>>
+  * nome : varchar(255)
+  * tipo_mime : varchar(120)
+  * tamanho : integer
+  * conteudo : bytea
+  * criado_em : timestamptz
+}
+entity instancia_whatsapp {
+  * cliente_id : uuid <<PK, FK>>
+  --
+  * instancia : varchar(64) <<UK>>
+  * token : varchar(128)
+  * vinculada_em : timestamptz
+}
+cliente ||--o| conta_acesso
 cliente ||--o{ conversa
 cliente ||--o{ destinatario
 destinatario ||--o| conversa
@@ -102,4 +203,17 @@ cliente ||--o{ campanha
 conversa ||--o{ atendimento
 cliente ||--o{ atendimento
 campanha |o--o{ mensagem
+cliente ||--|{ operador
+operador |o--o{ conversa
+conversa ||--o{ conversa_participante
+operador ||--o{ conversa_participante
+operador |o--o{ mensagem
+plano ||--o{ assinatura
+cliente ||--o| assinatura
+cliente ||--o{ departamento
+departamento |o--o{ conversa
+cliente ||--o| configuracao_ura
+departamento |o--o{ configuracao_ura
+cliente ||--o{ arquivo
+cliente ||--o| instancia_whatsapp
 @enduml

@@ -58,11 +58,22 @@ enum TipoDestinatario {
   CONTATO
   GRUPO
 }
+enum TipoMidia {
+  IMAGEM
+  DOCUMENTO
+  AUDIO
+  VIDEO
+}
+enum SituacaoAssinatura {
+  ATIVA
+  EM_ATRASO
+}
 enum TipoTransacao {
   CREDITO
   DEBITO
   ESTORNO
   AJUSTE_LIMITE
+  MENSALIDADE
 }
 
 PlanoPagamento <|.. PlanoPrePago
@@ -77,4 +88,6 @@ Mensagem -[hidden]down- TipoDestinatario
 TipoDocumento -[hidden]down- StatusMensagem
 TipoPlano -[hidden]down- StatusAtendimento
 Prioridade -[hidden]down- TipoTransacao
+TipoDestinatario -[hidden]down- TipoMidia
+TipoMidia -[hidden]down- SituacaoAssinatura
 @enduml
