@@ -51,7 +51,7 @@ class ConexaoWhatsAppUseCasesTest {
         Conversa conversa = conversas.buscarPorDestinatario(maria.id()).orElseThrow();
 
         new GerenciarAtendimentoUseCase(conversas, atendimentos, Fakes.SEM_TRANSACAO, relogio, mensagens, destinatarios,
-                canal).marcarComoLida(mercado, conversa.id());
+                canal, null).marcarComoLida(mercado, conversa.id());
 
         assertThat(canal.lidas).containsExactly("5544999990000:Z2");
         assertThat(conversas.buscarPorId(conversa.id()).orElseThrow().naoLidas()).isZero();
@@ -72,7 +72,7 @@ class ConexaoWhatsAppUseCasesTest {
         canal.falhar = true;
 
         Conversa lida = new GerenciarAtendimentoUseCase(conversas, atendimentos, Fakes.SEM_TRANSACAO, relogio, mensagens,
-                destinatarios, canal).marcarComoLida(mercado, conversa.id());
+                destinatarios, canal, null).marcarComoLida(mercado, conversa.id());
 
         assertThat(lida.naoLidas()).isZero();
     }
@@ -82,6 +82,24 @@ class ConexaoWhatsAppUseCasesTest {
         canal.situacaoFalha = true;
         var canais = new br.com.archat.aplicacao.canal.ListarCanaisUseCase(canal).listar();
         assertThat(canais).first().satisfies(c -> assertThat(c.conectado()).isFalse());
+    }
+
+    @Test
+    void importaDaAgendaSemDuplicarEComOfertasDesligadas() {
+        Fakes.Destinatarios destinatarios = new Fakes.Destinatarios();
+        UUID mercado = UUID.randomUUID();
+        destinatarios.salvar(Destinatario.novo(mercado, "Maria", "44999990000", true));
+        canal.agenda = List.of(new ConexaoWhatsApp.ContatoWhatsApp("5544999990000", "Maria"),
+                new ConexaoWhatsApp.ContatoWhatsApp("5544988887777", "João"));
+        var importar = new br.com.archat.aplicacao.destinatario.ImportarContatosUseCase(canal, destinatarios, Fakes.SEM_TRANSACAO);
+
+        assertThat(importar.listar(mercado, 1, 50)).extracting(c -> c.jaCadastrado()).containsExactly(true, false);
+        var resultado = importar.importar(mercado, canal.agenda);
+
+        assertThat(resultado.importados()).isEqualTo(1);
+        assertThat(resultado.ignorados()).isEqualTo(1);
+        assertThat(destinatarios.listarPorCliente(mercado)).filteredOn(d -> d.nome().equals("João"))
+                .singleElement().satisfies(d -> assertThat(d.aceitaOfertas()).isFalse());
     }
 
     static class CanalFalso implements ConexaoWhatsApp {
@@ -102,6 +120,15 @@ class ConexaoWhatsAppUseCasesTest {
             }
             lidas.add(telefoneOuGrupo + ":" + idExterno);
         }
+        final List<String> avisos = new ArrayList<>();
+        List<ContatoWhatsApp> agenda = List.of();
+        public void enviarAvisoDoSistema(String telefone, String texto) {
+            if (falhar) {
+                throw new IllegalStateException("canal fora do ar");
+            }
+            avisos.add(telefone + ":" + texto);
+        }
+        public List<ContatoWhatsApp> listarContatos(int pagina, int tamanhoPagina) { return agenda; }
         public void desconectar() { }
         public List<GrupoWhatsApp> listarGrupos(int pagina, int tamanhoPagina) { return List.of(); }
     }

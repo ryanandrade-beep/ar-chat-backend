@@ -18,6 +18,9 @@ public class AdministradorEntity {
     @Column(name = "senha_hash")
     private String senhaHash;
 
+    private String email;
+    private String telefone;
+
     protected AdministradorEntity() {
     }
 
@@ -28,8 +31,15 @@ public class AdministradorEntity {
         this.senhaHash = senhaHash;
     }
 
+    public void definirContato(String email, String telefone) {
+        this.email = email;
+        this.telefone = telefone;
+    }
+
     public UUID getId() { return id; }
     public String getNome() { return nome; }
     public String getLogin() { return login; }
     public String getSenhaHash() { return senhaHash; }
+    public String getEmail() { return email; }
+    public String getTelefone() { return telefone; }
 }

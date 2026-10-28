@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -325,6 +326,58 @@ class FluxoCompletoIT {
                  "media": {"type": "image", "url": "https://hortifruti.com/encarte.jpg"}}""")
                 .andExpect(status().isCreated());
         executar(get("/campaigns"), horti, null).andExpect(jsonPath("$[0].media.type").value("image"));
+    }
+
+    @Test
+    void donoCadastraOperadoresQueAtendemComLoginProprio() throws Exception {
+        String dono = corpo(mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
+                {"name": "Mercearia Boa Vista", "email": "dono@boavista.com", "phone": "44977776666",
+                 "documentId": "86288366757", "documentType": "CPF", "password": "boavista2026",
+                 "passwordConfirmation": "boavista2026", "acceptTerms": true}"""))
+                .andExpect(jsonPath("$.role").value("owner")), "$.token");
+        String admin = token(post("/admin/auth"), """
+                {"login": "admin", "password": "admin12345"}""");
+        String clienteId = corpo(executar(get("/clients/me"), dono, null), "$.id");
+        executar(post("/clients/" + clienteId + "/credits"), admin, """
+                {"amount": 10}""").andExpect(status().isOk());
+
+        String carla = corpo(executar(post("/operators"), dono, """
+                {"name": "Carla", "email": "carla@boavista.com", "password": "atende2026"}""")
+                .andExpect(status().isCreated()), "$.id");
+        executar(post("/operators"), dono, """
+                {"name": "Outra", "email": "dono@boavista.com", "password": "atende2026"}""")
+                .andExpect(status().isUnprocessableEntity());
+
+        String operadora = corpo(mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+                {"email": "carla@boavista.com", "password": "atende2026"}"""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("operator"))
+                .andExpect(jsonPath("$.userName").value("Carla")), "$.token");
+
+        executar(post("/operators"), operadora, """
+                {"name": "X", "email": "x@boavista.com", "password": "atende2026"}""").andExpect(status().isForbidden());
+        executar(get("/campaigns"), operadora, null).andExpect(status().isForbidden());
+        executar(get("/clients/me/transactions"), operadora, null).andExpect(status().isForbidden());
+
+        String contato = corpo(executar(post("/recipients"), operadora, """
+                {"name": "Dona Lúcia", "phone": "5544955554444"}""").andExpect(status().isCreated()), "$.id");
+        String conversa = corpo(executar(post("/messages"), operadora, """
+                {"recipientId": "%s", "content": "Seu pedido saiu!", "priority": "normal"}""".formatted(contato))
+                .andExpect(status().isCreated()), "$.conversationId");
+        executar(get("/conversations/" + conversa), dono, null)
+                .andExpect(jsonPath("$.operatorId").value(carla))
+                .andExpect(jsonPath("$.operatorName").value("Carla"));
+        executar(get("/conversations?assigned=me"), operadora, null).andExpect(jsonPath("$.length()").value(1));
+
+        executar(post("/conversations/" + conversa + "/assign"), dono, """
+                {"operatorId": null}""").andExpect(jsonPath("$.operatorId").doesNotExist());
+        executar(get("/conversations?assigned=none"), dono, null).andExpect(jsonPath("$[0].id").value(conversa));
+
+        executar(put("/operators/" + carla), dono, """
+                {"name": "Carla", "active": false}""").andExpect(jsonPath("$.active").value(false));
+        executar(get("/conversations"), operadora, null).andExpect(status().isUnauthorized());
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
+                {"email": "carla@boavista.com", "password": "atende2026"}""")).andExpect(status().isForbidden());
     }
 
     @Test

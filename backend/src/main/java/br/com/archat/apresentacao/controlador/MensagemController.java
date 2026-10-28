@@ -50,7 +50,7 @@ class MensagemController {
         ApiEnums.exigirCanalDisponivel(r.channel());
         return SendMessageResponse.de(enviar.executar(new EnviarMensagemUseCase.Comando(cliente.id(),
                 r.conversationId(), r.recipientId(), r.content(), MediaRequest.paraDominio(r.media()),
-                ApiEnums.prioridade(r.priority()))));
+                ApiEnums.prioridade(r.priority()), cliente.operadorId())));
     }
 
     @GetMapping

@@ -43,6 +43,44 @@ public class GerenciarAdministradoresUseCase {
         });
     }
 
+    public Administrador buscar(UUID administradorId) {
+        return administradores.buscarPorId(administradorId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Administrador"));
+    }
+
+    public Administrador atualizarDados(UUID administradorId, String nome, String email, String telefone) {
+        return unidadeDeTrabalho.executar(() -> {
+            Administrador atual = buscar(administradorId);
+            Administrador alterado = new Administrador(atual.id(), nome, atual.login(), atual.senhaHash(), email, telefone);
+            if (alterado.email() != null && administradores.listarTodos().stream()
+                    .anyMatch(a -> !a.id().equals(atual.id()) && alterado.email().equals(a.email()))) {
+                throw new RegraDeNegocioException("Já existe um administrador com este e-mail");
+            }
+            administradores.salvar(alterado);
+            return alterado;
+        });
+    }
+
+    public void trocarSenha(UUID administradorId, String senhaAtual, String novaSenha, String confirmacao) {
+        if (novaSenha == null || novaSenha.length() < TAMANHO_MINIMO_SENHA || novaSenha.length() > 72) {
+            throw new RegraDeNegocioException("A senha deve ter no mínimo " + TAMANHO_MINIMO_SENHA + " caracteres");
+        }
+        if (!novaSenha.equals(confirmacao)) {
+            throw new RegraDeNegocioException("A confirmação não confere com a senha");
+        }
+        unidadeDeTrabalho.executar(() -> {
+            Administrador atual = buscar(administradorId);
+            if (senhaAtual == null || !codificador.confere(senhaAtual, atual.senhaHash())) {
+                throw new RegraDeNegocioException("A senha atual está incorreta");
+            }
+            if (codificador.confere(novaSenha, atual.senhaHash())) {
+                throw new RegraDeNegocioException("A nova senha deve ser diferente da atual");
+            }
+            administradores.salvar(new Administrador(atual.id(), atual.nome(), atual.login(),
+                    codificador.codificar(novaSenha), atual.email(), atual.telefone()));
+        });
+    }
+
     public void excluir(UUID solicitanteId, UUID administradorId) {
         if (solicitanteId.equals(administradorId)) {
             throw new RegraDeNegocioException("O administrador não pode excluir a si mesmo");

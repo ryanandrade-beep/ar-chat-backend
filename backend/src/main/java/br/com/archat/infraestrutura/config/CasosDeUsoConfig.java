@@ -12,12 +12,14 @@ import br.com.archat.aplicacao.canal.ListarCanaisUseCase;
 import br.com.archat.aplicacao.cliente.AtualizarClienteUseCase;
 import br.com.archat.aplicacao.cliente.CadastrarClienteUseCase;
 import br.com.archat.aplicacao.cliente.ConsultarClientesUseCase;
+import br.com.archat.aplicacao.cliente.ConsultarExtratoUseCase;
 import br.com.archat.aplicacao.cliente.GerenciarFinanceiroUseCase;
 import br.com.archat.aplicacao.cliente.ReiniciarConsumoMensalUseCase;
 import br.com.archat.aplicacao.conta.CadastrarContaUseCase;
 import br.com.archat.aplicacao.conta.RecuperarSenhaUseCase;
 import br.com.archat.aplicacao.conversa.ConsultarConversasUseCase;
 import br.com.archat.aplicacao.destinatario.GerenciarDestinatariosUseCase;
+import br.com.archat.aplicacao.destinatario.ImportarContatosUseCase;
 import br.com.archat.aplicacao.mensagem.AtualizarStatusPeloCanalUseCase;
 import br.com.archat.aplicacao.mensagem.ConfirmarRecebimentoUseCase;
 import br.com.archat.aplicacao.mensagem.ConsultarMensagensUseCase;
@@ -25,6 +27,8 @@ import br.com.archat.aplicacao.mensagem.EnviarMensagemUseCase;
 import br.com.archat.aplicacao.mensagem.ProcessarMensagemUseCase;
 import br.com.archat.aplicacao.mensagem.RecuperarFilaUseCase;
 import br.com.archat.aplicacao.monitoramento.MonitorarFilaUseCase;
+import br.com.archat.aplicacao.operador.ConsultarEquipeUseCase;
+import br.com.archat.aplicacao.operador.GerenciarOperadoresUseCase;
 import br.com.archat.aplicacao.porta.AdministradorRepositorio;
 import br.com.archat.aplicacao.porta.AtendimentoRepositorio;
 import br.com.archat.aplicacao.porta.CampanhaRepositorio;
@@ -38,6 +42,7 @@ import br.com.archat.aplicacao.porta.EnvioDeEmail;
 import br.com.archat.aplicacao.porta.EnvioMensagemGateway;
 import br.com.archat.aplicacao.porta.MensagemRepositorio;
 import br.com.archat.aplicacao.porta.MetricasFila;
+import br.com.archat.aplicacao.porta.OperadorRepositorio;
 import br.com.archat.aplicacao.porta.ServicoToken;
 import br.com.archat.aplicacao.porta.TransacaoRepositorio;
 import br.com.archat.aplicacao.porta.UnidadeDeTrabalho;
@@ -74,9 +79,21 @@ class CasosDeUsoConfig {
     @Bean
     AutenticarClienteUseCase autenticarCliente(ClienteRepositorio clientes, ServicoToken tokens, Clock relogio,
                                                ArChatPropriedades propriedades, ContaDeAcessoRepositorio contas,
-                                               CodificadorSenha codificador) {
+                                               CodificadorSenha codificador, OperadorRepositorio operadores) {
         return new AutenticarClienteUseCase(clientes, tokens, relogio, propriedades.token().validade(), contas,
-                codificador);
+                codificador, operadores);
+    }
+
+    @Bean
+    ConsultarEquipeUseCase consultarEquipe(ContaDeAcessoRepositorio contas, OperadorRepositorio operadores) {
+        return new ConsultarEquipeUseCase(contas, operadores);
+    }
+
+    @Bean
+    GerenciarOperadoresUseCase gerenciarOperadores(OperadorRepositorio operadores, ContaDeAcessoRepositorio contas,
+                                                   CodificadorSenha codificador, UnidadeDeTrabalho unidadeDeTrabalho,
+                                                   Clock relogio) {
+        return new GerenciarOperadoresUseCase(operadores, contas, codificador, unidadeDeTrabalho, relogio);
     }
 
     @Bean
@@ -90,8 +107,9 @@ class CasosDeUsoConfig {
 
     @Bean
     RecuperarSenhaUseCase recuperarSenha(ContaDeAcessoRepositorio contas, CodificadorSenha codificador,
-                                         EnvioDeEmail email, UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio) {
-        return new RecuperarSenhaUseCase(contas, codificador, email, unidadeDeTrabalho, relogio);
+                                         EnvioDeEmail email, ConexaoWhatsApp whatsapp,
+                                         UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio) {
+        return new RecuperarSenhaUseCase(contas, codificador, email, whatsapp, unidadeDeTrabalho, relogio);
     }
 
     @Bean
@@ -116,6 +134,17 @@ class CasosDeUsoConfig {
     @Bean
     ConsultarClientesUseCase consultarClientes(ClienteRepositorio clientes) {
         return new ConsultarClientesUseCase(clientes);
+    }
+
+    @Bean
+    ConsultarExtratoUseCase consultarExtrato(TransacaoRepositorio transacoes, Clock relogio) {
+        return new ConsultarExtratoUseCase(transacoes, relogio);
+    }
+
+    @Bean
+    ImportarContatosUseCase importarContatos(ConexaoWhatsApp conexao, DestinatarioRepositorio destinatarios,
+                                             UnidadeDeTrabalho unidadeDeTrabalho) {
+        return new ImportarContatosUseCase(conexao, destinatarios, unidadeDeTrabalho);
     }
 
     @Bean
@@ -206,9 +235,9 @@ class CasosDeUsoConfig {
     GerenciarAtendimentoUseCase gerenciarAtendimento(ConversaRepositorio conversas, AtendimentoRepositorio atendimentos,
                                                      UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
                                                      MensagemRepositorio mensagens, DestinatarioRepositorio destinatarios,
-                                                     ConexaoWhatsApp canal) {
+                                                     ConexaoWhatsApp canal, OperadorRepositorio operadores) {
         return new GerenciarAtendimentoUseCase(conversas, atendimentos, unidadeDeTrabalho, relogio, mensagens,
-                destinatarios, canal);
+                destinatarios, canal, operadores);
     }
 
     @Bean

@@ -18,9 +18,10 @@ public class Conversa {
     private Instant dataUltimaMensagem;
     private int naoLidas;
     private StatusAtendimento statusAtendimento;
+    private UUID operadorId;
 
     private Conversa(UUID id, UUID clienteId, UUID destinatarioId, String ultimaMensagem,
-                     Instant dataUltimaMensagem, int naoLidas, StatusAtendimento statusAtendimento) {
+                     Instant dataUltimaMensagem, int naoLidas, StatusAtendimento statusAtendimento, UUID operadorId) {
         this.id = Objects.requireNonNull(id);
         this.clienteId = Objects.requireNonNull(clienteId);
         this.destinatarioId = Objects.requireNonNull(destinatarioId);
@@ -28,17 +29,36 @@ public class Conversa {
         this.dataUltimaMensagem = dataUltimaMensagem;
         this.naoLidas = naoLidas;
         this.statusAtendimento = statusAtendimento == null ? StatusAtendimento.FINALIZADO : statusAtendimento;
+        this.operadorId = operadorId;
     }
 
     public static Conversa iniciar(UUID clienteId, UUID destinatarioId) {
-        return new Conversa(UUID.randomUUID(), clienteId, destinatarioId, null, null, 0, StatusAtendimento.FINALIZADO);
+        return new Conversa(UUID.randomUUID(), clienteId, destinatarioId, null, null, 0, StatusAtendimento.FINALIZADO,
+                null);
     }
 
     public static Conversa reconstituir(UUID id, UUID clienteId, UUID destinatarioId, String ultimaMensagem,
                                         Instant dataUltimaMensagem, int naoLidas,
                                         StatusAtendimento statusAtendimento) {
+        return reconstituir(id, clienteId, destinatarioId, ultimaMensagem, dataUltimaMensagem, naoLidas,
+                statusAtendimento, null);
+    }
+
+    public static Conversa reconstituir(UUID id, UUID clienteId, UUID destinatarioId, String ultimaMensagem,
+                                        Instant dataUltimaMensagem, int naoLidas,
+                                        StatusAtendimento statusAtendimento, UUID operadorId) {
         return new Conversa(id, clienteId, destinatarioId, ultimaMensagem, dataUltimaMensagem, naoLidas,
-                statusAtendimento);
+                statusAtendimento, operadorId);
+    }
+
+    public void atribuirA(UUID operadorId) {
+        this.operadorId = operadorId;
+    }
+
+    public void assumirSeLivre(UUID operadorId) {
+        if (this.operadorId == null && operadorId != null) {
+            this.operadorId = operadorId;
+        }
     }
 
     public void registrar(Mensagem mensagem) {
@@ -71,4 +91,5 @@ public class Conversa {
     public Instant dataUltimaMensagem() { return dataUltimaMensagem; }
     public int naoLidas() { return naoLidas; }
     public StatusAtendimento statusAtendimento() { return statusAtendimento; }
+    public UUID operadorId() { return operadorId; }
 }

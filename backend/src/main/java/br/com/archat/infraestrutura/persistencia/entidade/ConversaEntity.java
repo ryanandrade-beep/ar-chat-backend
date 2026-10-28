@@ -31,6 +31,9 @@ public class ConversaEntity {
     @Column(name = "status_atendimento")
     private StatusAtendimento statusAtendimento;
 
+    @Column(name = "operador_id")
+    private UUID operadorId;
+
     protected ConversaEntity() {
     }
 
@@ -52,4 +55,10 @@ public class ConversaEntity {
     public Instant getDataUltimaMensagem() { return dataUltimaMensagem; }
     public int getNaoLidas() { return naoLidas; }
     public StatusAtendimento getStatusAtendimento() { return statusAtendimento; }
+
+    public void definirOperador(UUID operadorId) {
+        this.operadorId = operadorId;
+    }
+
+    public UUID getOperadorId() { return operadorId; }
 }

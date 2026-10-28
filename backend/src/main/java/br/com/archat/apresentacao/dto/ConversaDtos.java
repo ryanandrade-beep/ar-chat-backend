@@ -12,13 +12,19 @@ public final class ConversaDtos {
 
     public record ConversationResponse(UUID id, UUID recipientId, String recipientName, String recipientPhone,
                                        String recipientType, String status, String lastMessageContent,
-                                       Instant lastMessageTime, int unreadCount) {
+                                       Instant lastMessageTime, int unreadCount, UUID operatorId,
+                                       String operatorName) {
 
         public static ConversationResponse de(ResumoConversa resumo) {
+            return de(resumo, java.util.Map.of());
+        }
+
+        public static ConversationResponse de(ResumoConversa resumo, java.util.Map<UUID, String> nomesDosOperadores) {
             var c = resumo.conversa();
             var d = resumo.destinatario();
             return new ConversationResponse(c.id(), d.id(), d.nome(), d.telefone(), d.grupo() ? "group" : "contact",
-                    ApiEnums.atendimento(c.statusAtendimento()), c.ultimaMensagem(), c.dataUltimaMensagem(), c.naoLidas());
+                    ApiEnums.atendimento(c.statusAtendimento()), c.ultimaMensagem(), c.dataUltimaMensagem(), c.naoLidas(),
+                    c.operadorId(), c.operadorId() == null ? null : nomesDosOperadores.get(c.operadorId()));
         }
     }
 }

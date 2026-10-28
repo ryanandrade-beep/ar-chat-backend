@@ -15,10 +15,17 @@ public final class AdministradorDtos {
                                      @NotBlank @Size(min = 8, max = 72) String password) {
     }
 
-    public record AdminResponse(UUID id, String name, String login) {
+    public record UpdateMyAccountRequest(@NotBlank @Size(max = 120) String name, String email, String phone) {
+    }
+
+    public record ChangePasswordRequest(@NotBlank String currentPassword, @NotBlank String newPassword,
+                                        @NotBlank String passwordConfirmation) {
+    }
+
+    public record AdminResponse(UUID id, String name, String login, String email, String phone) {
 
         public static AdminResponse de(Administrador a) {
-            return new AdminResponse(a.id(), a.nome(), a.login());
+            return new AdminResponse(a.id(), a.nome(), a.login(), a.email(), a.telefone());
         }
     }
 }

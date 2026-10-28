@@ -21,8 +21,10 @@ class ConversaRepositorioJpa implements ConversaRepositorio {
 
     @Override
     public void salvar(Conversa c) {
-        jpa.save(new ConversaEntity(c.id(), c.clienteId(), c.destinatarioId(), c.ultimaMensagem(),
-                c.dataUltimaMensagem(), c.naoLidas(), c.statusAtendimento()));
+        ConversaEntity entidade = new ConversaEntity(c.id(), c.clienteId(), c.destinatarioId(), c.ultimaMensagem(),
+                c.dataUltimaMensagem(), c.naoLidas(), c.statusAtendimento());
+        entidade.definirOperador(c.operadorId());
+        jpa.save(entidade);
     }
 
     @Override
@@ -43,6 +45,6 @@ class ConversaRepositorioJpa implements ConversaRepositorio {
 
     private static Conversa paraDominio(ConversaEntity e) {
         return Conversa.reconstituir(e.getId(), e.getClienteId(), e.getDestinatarioId(), e.getUltimaMensagem(),
-                e.getDataUltimaMensagem(), e.getNaoLidas(), e.getStatusAtendimento());
+                e.getDataUltimaMensagem(), e.getNaoLidas(), e.getStatusAtendimento(), e.getOperadorId());
     }
 }

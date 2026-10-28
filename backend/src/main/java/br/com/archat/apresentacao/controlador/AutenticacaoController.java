@@ -52,17 +52,22 @@ class AutenticacaoController {
     }
 
     @PostMapping("/auth/login")
-    @Operation(summary = "Autentica o cliente por e-mail e senha")
+    @Operation(summary = "Autentica por e-mail e senha o dono da workspace ou um operador")
     ClientAuthResponse entrar(@Valid @RequestBody EmailLoginRequest r) {
         var autenticado = autenticarCliente.porEmail(r.email(), r.password());
-        return new ClientAuthResponse(autenticado.token(), ClientResponse.de(autenticado.cliente()));
+        var operador = autenticado.operador();
+        return new ClientAuthResponse(autenticado.token(), ClientResponse.de(autenticado.cliente()),
+                operador == null ? "owner" : "operator",
+                operador == null ? autenticado.cliente().nome() : operador.nome(),
+                operador == null ? null : operador.id());
     }
 
     @PostMapping("/auth/forgot-password")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    @Operation(summary = "Envia o código de redefinição para o e-mail (responde igual se o e-mail não existir)")
+    @Operation(summary = "Envia o código de redefinição por e-mail ou WhatsApp (responde igual se o e-mail não existir)")
     void esqueciSenha(@Valid @RequestBody ForgotPasswordRequest r) {
-        recuperarSenha.solicitar(r.email());
+        recuperarSenha.solicitar(r.email(), "whatsapp".equalsIgnoreCase(r.channel())
+                ? RecuperarSenhaUseCase.Canal.WHATSAPP : RecuperarSenhaUseCase.Canal.EMAIL);
     }
 
     @PostMapping("/auth/reset-password")

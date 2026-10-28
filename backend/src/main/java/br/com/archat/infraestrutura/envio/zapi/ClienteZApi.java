@@ -2,6 +2,7 @@ package br.com.archat.infraestrutura.envio.zapi;
 
 import br.com.archat.infraestrutura.config.ArChatPropriedades;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -91,6 +92,12 @@ class ClienteZApi {
         return grupos == null ? List.of() : List.of(grupos);
     }
 
+    List<ContatoZApi> contatos(int pagina, int tamanhoPagina) {
+        ContatoZApi[] contatos = http.get().uri("/contacts?page={pagina}&pageSize={tamanho}", pagina, tamanhoPagina)
+                .retrieve().body(ContatoZApi[].class);
+        return contatos == null ? List.of() : List.of(contatos);
+    }
+
     void desconectar() {
         http.get().uri("/disconnect").retrieve().toBodilessEntity();
     }
@@ -127,5 +134,8 @@ class ClienteZApi {
     }
 
     record GrupoZApi(String phone, String name, Boolean isGroup) {
+    }
+
+    record ContatoZApi(String phone, String name, @JsonProperty("short") String curto, String vname, @JsonProperty("notify") String apelido) {
     }
 }

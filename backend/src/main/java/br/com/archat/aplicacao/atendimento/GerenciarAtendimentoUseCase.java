@@ -6,6 +6,7 @@ import br.com.archat.aplicacao.porta.ConversaRepositorio;
 import br.com.archat.aplicacao.porta.DestinatarioRepositorio;
 import br.com.archat.aplicacao.porta.FiltroMensagens;
 import br.com.archat.aplicacao.porta.MensagemRepositorio;
+import br.com.archat.aplicacao.porta.OperadorRepositorio;
 import br.com.archat.aplicacao.porta.UnidadeDeTrabalho;
 import br.com.archat.dominio.atendimento.Atendimento;
 import br.com.archat.dominio.atendimento.StatusAtendimento;
@@ -32,16 +33,17 @@ public class GerenciarAtendimentoUseCase {
     private final MensagemRepositorio mensagens;
     private final DestinatarioRepositorio destinatarios;
     private final ConexaoWhatsApp canal;
+    private final OperadorRepositorio operadores;
 
     public GerenciarAtendimentoUseCase(ConversaRepositorio conversas, AtendimentoRepositorio atendimentos,
                                        UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio) {
-        this(conversas, atendimentos, unidadeDeTrabalho, relogio, null, null, null);
+        this(conversas, atendimentos, unidadeDeTrabalho, relogio, null, null, null, null);
     }
 
     public GerenciarAtendimentoUseCase(ConversaRepositorio conversas, AtendimentoRepositorio atendimentos,
                                        UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
                                        MensagemRepositorio mensagens, DestinatarioRepositorio destinatarios,
-                                       ConexaoWhatsApp canal) {
+                                       ConexaoWhatsApp canal, OperadorRepositorio operadores) {
         this.conversas = conversas;
         this.atendimentos = atendimentos;
         this.unidadeDeTrabalho = unidadeDeTrabalho;
@@ -49,6 +51,25 @@ public class GerenciarAtendimentoUseCase {
         this.mensagens = mensagens;
         this.destinatarios = destinatarios;
         this.canal = canal;
+        this.operadores = operadores;
+    }
+
+    public Conversa atribuir(UUID clienteId, UUID conversaId, UUID operadorId, UUID solicitante) {
+        return unidadeDeTrabalho.executar(() -> {
+            Conversa conversa = daEmpresa(clienteId, conversaId);
+            if (operadorId != null) {
+                operadores.buscarPorId(operadorId)
+                        .filter(o -> o.pertenceA(clienteId) && o.ativo())
+                        .orElseThrow(() -> new RegraDeNegocioException("Operador inválido ou desativado"));
+            }
+            if (solicitante != null && conversa.operadorId() != null && !conversa.operadorId().equals(solicitante)
+                    && !solicitante.equals(operadorId)) {
+                throw new RegraDeNegocioException("Esta conversa está com outro operador");
+            }
+            conversa.atribuirA(operadorId);
+            conversas.salvar(conversa);
+            return conversa;
+        });
     }
 
     public Conversa colocarEmEspera(UUID clienteId, UUID conversaId) {

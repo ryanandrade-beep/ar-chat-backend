@@ -21,7 +21,9 @@ class AdministradorRepositorioJpa implements AdministradorRepositorio {
 
     @Override
     public void salvar(Administrador a) {
-        jpa.save(new AdministradorEntity(a.id(), a.nome(), a.login(), a.senhaHash()));
+        AdministradorEntity entidade = new AdministradorEntity(a.id(), a.nome(), a.login(), a.senhaHash());
+        entidade.definirContato(a.email(), a.telefone());
+        jpa.save(entidade);
     }
 
     @Override
@@ -51,6 +53,6 @@ class AdministradorRepositorioJpa implements AdministradorRepositorio {
     }
 
     private static Administrador paraDominio(AdministradorEntity e) {
-        return new Administrador(e.getId(), e.getNome(), e.getLogin(), e.getSenhaHash());
+        return new Administrador(e.getId(), e.getNome(), e.getLogin(), e.getSenhaHash(), e.getEmail(), e.getTelefone());
     }
 }

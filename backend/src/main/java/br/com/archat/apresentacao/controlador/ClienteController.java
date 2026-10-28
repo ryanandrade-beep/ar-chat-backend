@@ -3,6 +3,8 @@ package br.com.archat.apresentacao.controlador;
 import br.com.archat.aplicacao.cliente.AtualizarClienteUseCase;
 import br.com.archat.aplicacao.cliente.CadastrarClienteUseCase;
 import br.com.archat.aplicacao.cliente.ConsultarClientesUseCase;
+import br.com.archat.aplicacao.cliente.ConsultarExtratoUseCase;
+import br.com.archat.aplicacao.operador.ConsultarEquipeUseCase;
 import br.com.archat.aplicacao.cliente.GerenciarFinanceiroUseCase;
 import br.com.archat.apresentacao.dto.ApiEnums;
 import br.com.archat.apresentacao.dto.ClienteDtos.BalanceResponse;
@@ -11,6 +13,7 @@ import br.com.archat.apresentacao.dto.ClienteDtos.ClientResponse;
 import br.com.archat.apresentacao.dto.ClienteDtos.CreateClientRequest;
 import br.com.archat.apresentacao.dto.ClienteDtos.CreditRequest;
 import br.com.archat.apresentacao.dto.ClienteDtos.LimitRequest;
+import br.com.archat.apresentacao.dto.ClienteDtos.TransactionResponse;
 import br.com.archat.apresentacao.dto.ClienteDtos.UpdateClientRequest;
 import br.com.archat.apresentacao.seguranca.AdministradorAutenticado;
 import br.com.archat.apresentacao.seguranca.ClienteAutenticado;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -41,12 +45,18 @@ class ClienteController {
     private final ConsultarClientesUseCase consultar;
     private final GerenciarFinanceiroUseCase financeiro;
 
+    private final ConsultarExtratoUseCase extrato;
+    private final ConsultarEquipeUseCase equipe;
+
     ClienteController(CadastrarClienteUseCase cadastrar, AtualizarClienteUseCase atualizar,
-                      ConsultarClientesUseCase consultar, GerenciarFinanceiroUseCase financeiro) {
+                      ConsultarClientesUseCase consultar, GerenciarFinanceiroUseCase financeiro,
+                      ConsultarExtratoUseCase extrato, ConsultarEquipeUseCase equipe) {
         this.cadastrar = cadastrar;
         this.atualizar = atualizar;
         this.consultar = consultar;
         this.financeiro = financeiro;
+        this.extrato = extrato;
+        this.equipe = equipe;
     }
 
     @GetMapping
@@ -69,6 +79,13 @@ class ClienteController {
         return ClientResponse.de(consultar.buscar(cliente.id()));
     }
 
+    @GetMapping("/me/transactions")
+    @Operation(summary = "Extrato do cliente autenticado (últimos 90 dias): créditos, débitos e estornos")
+    List<TransactionResponse> meuExtrato(ClienteAutenticado cliente, @RequestParam(defaultValue = "30") int limit) {
+        cliente.exigirGestor();
+        return extrato.ultimas(cliente.id(), limit).stream().map(TransactionResponse::de).toList();
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Detalhes de um cliente (admin)")
     ClientResponse buscar(AdministradorAutenticado administrador, @PathVariable UUID id) {
@@ -80,6 +97,24 @@ class ClienteController {
     ClientResponse atualizar(AdministradorAutenticado administrador, @PathVariable UUID id,
                              @Valid @RequestBody UpdateClientRequest r) {
         return ClientResponse.de(atualizar.executar(id, r.name(), r.active()));
+    }
+
+    @GetMapping("/{id}/team")
+    @Operation(summary = "Backoffice: responsável (e-mail e telefone) e operadores da workspace (admin)")
+    TeamResponse equipe(AdministradorAutenticado administrador, @PathVariable UUID id) {
+        consultar.buscar(id);
+        var equipe = this.equipe.consultar(id);
+        return new TeamResponse(equipe.responsavel().map(c -> new OwnerResponse(c.email(), c.telefone(), c.termosAceitosEm())).orElse(null),
+                equipe.operadores().stream().map(o -> new TeamOperator(o.id(), o.nome(), o.email(), o.ativo())).toList());
+    }
+
+    record OwnerResponse(String email, String phone, java.time.Instant termsAcceptedAt) {
+    }
+
+    record TeamOperator(UUID id, String name, String email, boolean active) {
+    }
+
+    record TeamResponse(OwnerResponse owner, List<TeamOperator> operators) {
     }
 
     @GetMapping("/{id}/balance")

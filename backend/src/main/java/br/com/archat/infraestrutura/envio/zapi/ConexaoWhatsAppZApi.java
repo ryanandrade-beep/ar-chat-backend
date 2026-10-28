@@ -65,11 +65,33 @@ class ConexaoWhatsAppZApi implements ConexaoWhatsApp {
     }
 
     @Override
+    public void enviarAvisoDoSistema(String telefone, String texto) {
+        chamar(() -> zapi.enviarTexto(EnvioMensagemZApi.comDdi(telefone), texto));
+    }
+
+    @Override
     public void desconectar() {
         chamar(() -> {
             zapi.desconectar();
             return null;
         });
+    }
+
+    @Override
+    public List<ContatoWhatsApp> listarContatos(int pagina, int tamanhoPagina) {
+        return chamar(() -> zapi.contatos(pagina, tamanhoPagina)).stream()
+                .filter(c -> c.phone() != null && c.phone().matches("\\d{10,15}"))
+                .map(c -> new ContatoWhatsApp(c.phone(), primeiroPreenchido(c.name(), c.curto(), c.vname(), c.apelido(), c.phone())))
+                .toList();
+    }
+
+    private static String primeiroPreenchido(String... valores) {
+        for (String valor : valores) {
+            if (valor != null && !valor.isBlank()) {
+                return valor.strip();
+            }
+        }
+        return "";
     }
 
     @Override

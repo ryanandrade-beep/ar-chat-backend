@@ -1,12 +1,16 @@
 package br.com.archat.apresentacao.controlador;
 
 import br.com.archat.aplicacao.destinatario.GerenciarDestinatariosUseCase;
+import br.com.archat.aplicacao.destinatario.ImportarContatosUseCase;
+import br.com.archat.aplicacao.porta.ConexaoWhatsApp;
 import br.com.archat.apresentacao.dto.DestinatarioDtos.RecipientRequest;
 import br.com.archat.apresentacao.dto.DestinatarioDtos.RecipientResponse;
 import br.com.archat.apresentacao.seguranca.ClienteAutenticado;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,9 +32,39 @@ import java.util.UUID;
 class DestinatarioController {
 
     private final GerenciarDestinatariosUseCase destinatarios;
+    private final ImportarContatosUseCase importar;
 
-    DestinatarioController(GerenciarDestinatariosUseCase destinatarios) {
+    DestinatarioController(GerenciarDestinatariosUseCase destinatarios, ImportarContatosUseCase importar) {
         this.destinatarios = destinatarios;
+        this.importar = importar;
+    }
+
+    @GetMapping("/whatsapp-contacts")
+    @Operation(summary = "Contatos da agenda do WhatsApp conectado, indicando os já cadastrados")
+    List<PhoneContactResponse> agenda(ClienteAutenticado cliente, @RequestParam(defaultValue = "1") int page,
+                                      @RequestParam(defaultValue = "100") int size) {
+        return importar.listar(cliente.id(), page, size).stream()
+                .map(c -> new PhoneContactResponse(c.telefone(), c.nome(), c.jaCadastrado())).toList();
+    }
+
+    @PostMapping("/import")
+    @Operation(summary = "Importa contatos da agenda como destinatários (sem consentimento para ofertas; duplicados são ignorados)")
+    ImportResponse importar(ClienteAutenticado cliente, @Valid @RequestBody ImportRequest r) {
+        var resultado = importar.importar(cliente.id(), r.contacts().stream()
+                .map(c -> new ConexaoWhatsApp.ContatoWhatsApp(c.phone(), c.name())).toList());
+        return new ImportResponse(resultado.importados(), resultado.ignorados());
+    }
+
+    record PhoneContactResponse(String phone, String name, boolean alreadySaved) {
+    }
+
+    record ImportRequest(@NotEmpty List<@Valid PhoneContact> contacts) {
+
+        record PhoneContact(@NotBlank String phone, String name) {
+        }
+    }
+
+    record ImportResponse(int imported, int skipped) {
     }
 
     @GetMapping

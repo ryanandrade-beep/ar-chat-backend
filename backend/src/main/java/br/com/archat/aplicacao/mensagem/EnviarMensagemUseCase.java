@@ -69,6 +69,7 @@ public class EnviarMensagemUseCase {
 
             cliente.cobrar(mensagem.custo());
             conversa.registrar(mensagem);
+            conversa.assumirSeLivre(comando.operadorId());
 
             clientes.salvar(cliente);
             conversas.salvar(conversa);
@@ -103,10 +104,15 @@ public class EnviarMensagemUseCase {
     }
 
     public record Comando(UUID clienteId, UUID conversaId, UUID destinatarioId, String conteudo, Midia midia,
-                          Prioridade prioridade) {
+                          Prioridade prioridade, UUID operadorId) {
+
+        public Comando(UUID clienteId, UUID conversaId, UUID destinatarioId, String conteudo, Midia midia,
+                       Prioridade prioridade) {
+            this(clienteId, conversaId, destinatarioId, conteudo, midia, prioridade, null);
+        }
 
         public Comando(UUID clienteId, UUID conversaId, UUID destinatarioId, String conteudo, Prioridade prioridade) {
-            this(clienteId, conversaId, destinatarioId, conteudo, null, prioridade);
+            this(clienteId, conversaId, destinatarioId, conteudo, null, prioridade, null);
         }
     }
 

@@ -40,6 +40,7 @@ class CampanhaController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Dispara uma campanha: cobra tudo de uma vez ou recusa sem cobrar (402)")
     CampaignCreatedResponse disparar(ClienteAutenticado cliente, @Valid @RequestBody CreateCampaignRequest r) {
+        cliente.exigirGestor();
         ApiEnums.exigirCanalDisponivel(r.channel());
         return CampaignCreatedResponse.de(disparar.executar(new DispararCampanhaUseCase.Comando(cliente.id(), r.name(),
                 r.content(), MediaRequest.paraDominio(r.media()), ApiEnums.prioridade(r.priority()), r.recipientIds(),
@@ -49,12 +50,14 @@ class CampanhaController {
     @GetMapping
     @Operation(summary = "Campanhas do cliente com o andamento das mensagens")
     List<CampaignResponse> listar(ClienteAutenticado cliente) {
+        cliente.exigirGestor();
         return consultar.listar(cliente.id()).stream().map(CampaignResponse::de).toList();
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Andamento de uma campanha")
     CampaignResponse buscar(ClienteAutenticado cliente, @PathVariable UUID id) {
+        cliente.exigirGestor();
         return CampaignResponse.de(consultar.buscar(cliente.id(), id));
     }
 }

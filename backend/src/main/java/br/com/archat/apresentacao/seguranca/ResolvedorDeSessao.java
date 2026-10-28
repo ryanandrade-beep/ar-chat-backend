@@ -3,7 +3,9 @@ package br.com.archat.apresentacao.seguranca;
 import br.com.archat.aplicacao.autenticacao.Sessao;
 import br.com.archat.aplicacao.excecao.AcessoNegadoException;
 import br.com.archat.aplicacao.excecao.NaoAutenticadoException;
+import br.com.archat.aplicacao.porta.OperadorRepositorio;
 import br.com.archat.aplicacao.porta.ServicoToken;
+import br.com.archat.dominio.cliente.Operador;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -27,9 +29,11 @@ public class ResolvedorDeSessao implements HandlerMethodArgumentResolver {
             UsuarioAutenticado.class);
 
     private final ServicoToken tokens;
+    private final OperadorRepositorio operadores;
 
-    public ResolvedorDeSessao(ServicoToken tokens) {
+    public ResolvedorDeSessao(ServicoToken tokens, OperadorRepositorio operadores) {
         this.tokens = tokens;
+        this.operadores = operadores;
     }
 
     @Override
@@ -43,9 +47,18 @@ public class ResolvedorDeSessao implements HandlerMethodArgumentResolver {
         Sessao sessao = sessao(requisicao.getHeader(HttpHeaders.AUTHORIZATION));
         Class<?> tipo = parametro.getParameterType();
         if (tipo == UsuarioAutenticado.class) {
+            if (sessao.perfil() == Sessao.Perfil.OPERADOR) {
+                throw new AcessoNegadoException("Disponível apenas para o responsável pela conta");
+            }
             return new UsuarioAutenticado(sessao);
         }
         if (tipo == ClienteAutenticado.class) {
+            if (sessao.perfil() == Sessao.Perfil.OPERADOR) {
+                Operador operador = operadores.buscarPorId(sessao.id())
+                        .filter(Operador::ativo)
+                        .orElseThrow(() -> new NaoAutenticadoException("Operador desativado ou removido"));
+                return new ClienteAutenticado(operador.clienteId(), operador.id());
+            }
             exigirPerfil(sessao, Sessao.Perfil.CLIENTE, "Rota disponível apenas para clientes");
             return new ClienteAutenticado(sessao.id());
         }
