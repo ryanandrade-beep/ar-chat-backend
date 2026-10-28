@@ -51,7 +51,7 @@ class ConexaoWhatsAppUseCasesTest {
         Conversa conversa = conversas.buscarPorDestinatario(maria.id()).orElseThrow();
 
         new GerenciarAtendimentoUseCase(conversas, atendimentos, Fakes.SEM_TRANSACAO, relogio, mensagens, destinatarios,
-                canal, null).marcarComoLida(mercado, conversa.id());
+                canal, null, null).marcarComoLida(mercado, conversa.id());
 
         assertThat(canal.lidas).containsExactly("5544999990000:Z2");
         assertThat(conversas.buscarPorId(conversa.id()).orElseThrow().naoLidas()).isZero();
@@ -72,7 +72,7 @@ class ConexaoWhatsAppUseCasesTest {
         canal.falhar = true;
 
         Conversa lida = new GerenciarAtendimentoUseCase(conversas, atendimentos, Fakes.SEM_TRANSACAO, relogio, mensagens,
-                destinatarios, canal, null).marcarComoLida(mercado, conversa.id());
+                destinatarios, canal, null, null).marcarComoLida(mercado, conversa.id());
 
         assertThat(lida.naoLidas()).isZero();
     }

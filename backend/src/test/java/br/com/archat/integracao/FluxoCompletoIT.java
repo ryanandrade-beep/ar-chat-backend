@@ -425,6 +425,61 @@ class FluxoCompletoIT {
     }
 
     @Test
+    void uraEnviaOMenuEEncaminhaParaODepartamentoEscolhido() throws Exception {
+        String dono = corpo(mvc.perform(post("/auth/register").contentType(MediaType.APPLICATION_JSON).content("""
+                {"name": "Mercadinho Sol", "email": "dono@sol.com", "phone": "44955556666",
+                 "documentId": "28625587887", "documentType": "CPF", "password": "mercado2026",
+                 "passwordConfirmation": "mercado2026", "acceptTerms": true}""")), "$.token");
+        executar(put("/ivr"), dono, """
+                {"active": true, "welcomeMessage": "Olá {nome}!", "questionMessage": "Com quem deseja falar?",
+                 "maxAttempts": 2, "ignoreGroups": true}""").andExpect(status().isUnprocessableEntity());
+        executar(post("/departments"), dono, """
+                {"name": "Entregas"}""").andExpect(status().isCreated());
+        String acougue = corpo(executar(post("/departments"), dono, """
+                {"name": "Açougue"}""").andExpect(status().isCreated()), "$.id");
+        executar(put("/ivr"), dono, """
+                {"active": true, "welcomeMessage": "Olá {nome}!", "questionMessage": "Com quem deseja falar?",
+                 "maxAttempts": 2, "defaultDepartmentId": "%s", "ignoreGroups": true}""".formatted(acougue))
+                .andExpect(jsonPath("$.active").value(true));
+        executar(post("/recipients"), dono, """
+                {"name": "Seu Zé", "phone": "5544933332222"}""").andExpect(status().isCreated());
+
+        receber("5544933332222", "URA-1", "Boa tarde");
+        String conversa = corpo(executar(get("/conversations?status=waiting"), dono, null)
+                .andExpect(jsonPath("$[0].waitingIvr").value(true)), "$[0].id");
+        executar(get("/conversations/" + conversa + "/messages"), dono, null)
+                .andExpect(jsonPath("$[1].automatic").value(true))
+                .andExpect(jsonPath("$[1].content").value("Olá Seu Zé!"))
+                .andExpect(jsonPath("$[2].content").value("Com quem deseja falar?\n1 - Açougue\n2 - Entregas"))
+                .andExpect(jsonPath("$[2].cost").value(0));
+
+        receber("5544933332222", "URA-2", "2");
+        executar(get("/conversations/" + conversa), dono, null)
+                .andExpect(jsonPath("$.departmentName").value("Entregas"))
+                .andExpect(jsonPath("$.waitingIvr").value(false));
+
+        executar(put("/conversations/" + conversa + "/department"), dono, """
+                {"departmentId": "%s"}""".formatted(acougue)).andExpect(jsonPath("$.departmentName").value("Açougue"));
+        executar(get("/conversations?department=" + acougue), dono, null).andExpect(jsonPath("$[0].id").value(conversa));
+
+        String hoje = LocalDate.now(java.time.ZoneId.of("America/Sao_Paulo")).toString();
+        executar(get("/reports/dashboard?from=%s&to=%s".formatted(hoje, hoje)), dono, null)
+                .andExpect(jsonPath("$.attendances").value(1))
+                .andExpect(jsonPath("$.openNow").value(1))
+                .andExpect(jsonPath("$.waitingNow").value(1))
+                .andExpect(jsonPath("$.topContacts[0].name").value("Seu Zé"))
+                .andExpect(jsonPath("$.perOperator[0].name").value("Sem responsável"));
+    }
+
+    private void receber(String telefone, String id, String texto) throws Exception {
+        mvc.perform(post("/webhooks/zapi/segredo-de-teste/received").contentType(MediaType.APPLICATION_JSON).content("""
+                {"messageId": "%s", "phone": "%s", "fromMe": false, "momment": %d, "type": "ReceivedCallback",
+                 "isGroup": false, "senderName": "Zé", "text": {"message": "%s"}}"""
+                .formatted(id, telefone, System.currentTimeMillis(), texto)))
+                .andExpect(jsonPath("$.registered").value(true));
+    }
+
+    @Test
     void canaisMostramWhatsAppBusinessEmBreve() throws Exception {
         String admin = token(post("/admin/auth"), """
                 {"login": "admin", "password": "admin12345"}""");

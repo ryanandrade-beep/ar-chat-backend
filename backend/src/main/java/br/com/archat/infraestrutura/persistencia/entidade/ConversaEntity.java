@@ -34,6 +34,13 @@ public class ConversaEntity {
     @Column(name = "operador_id")
     private UUID operadorId;
 
+    @Column(name = "departamento_id")
+    private UUID departamentoId;
+    @Column(name = "aguardando_ura")
+    private boolean aguardandoUra;
+    @Column(name = "tentativas_ura")
+    private int tentativasUra;
+
     protected ConversaEntity() {
     }
 
@@ -60,5 +67,14 @@ public class ConversaEntity {
         this.operadorId = operadorId;
     }
 
+    public void definirUra(UUID departamentoId, boolean aguardandoUra, int tentativasUra) {
+        this.departamentoId = departamentoId;
+        this.aguardandoUra = aguardandoUra;
+        this.tentativasUra = tentativasUra;
+    }
+
     public UUID getOperadorId() { return operadorId; }
+    public UUID getDepartamentoId() { return departamentoId; }
+    public boolean isAguardandoUra() { return aguardandoUra; }
+    public int getTentativasUra() { return tentativasUra; }
 }

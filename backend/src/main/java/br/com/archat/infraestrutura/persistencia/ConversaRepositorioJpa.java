@@ -24,6 +24,7 @@ class ConversaRepositorioJpa implements ConversaRepositorio {
         ConversaEntity entidade = new ConversaEntity(c.id(), c.clienteId(), c.destinatarioId(), c.ultimaMensagem(),
                 c.dataUltimaMensagem(), c.naoLidas(), c.statusAtendimento());
         entidade.definirOperador(c.operadorId());
+        entidade.definirUra(c.departamentoId(), c.aguardandoUra(), c.tentativasUra());
         jpa.save(entidade);
     }
 
@@ -45,6 +46,7 @@ class ConversaRepositorioJpa implements ConversaRepositorio {
 
     private static Conversa paraDominio(ConversaEntity e) {
         return Conversa.reconstituir(e.getId(), e.getClienteId(), e.getDestinatarioId(), e.getUltimaMensagem(),
-                e.getDataUltimaMensagem(), e.getNaoLidas(), e.getStatusAtendimento(), e.getOperadorId());
+                e.getDataUltimaMensagem(), e.getNaoLidas(), e.getStatusAtendimento(), e.getOperadorId(),
+                e.getDepartamentoId(), e.isAguardandoUra(), e.getTentativasUra());
     }
 }

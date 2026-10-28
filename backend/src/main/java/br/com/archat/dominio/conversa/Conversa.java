@@ -19,6 +19,9 @@ public class Conversa {
     private int naoLidas;
     private StatusAtendimento statusAtendimento;
     private UUID operadorId;
+    private UUID departamentoId;
+    private boolean aguardandoUra;
+    private int tentativasUra;
 
     private Conversa(UUID id, UUID clienteId, UUID destinatarioId, String ultimaMensagem,
                      Instant dataUltimaMensagem, int naoLidas, StatusAtendimento statusAtendimento, UUID operadorId) {
@@ -49,6 +52,33 @@ public class Conversa {
                                         StatusAtendimento statusAtendimento, UUID operadorId) {
         return new Conversa(id, clienteId, destinatarioId, ultimaMensagem, dataUltimaMensagem, naoLidas,
                 statusAtendimento, operadorId);
+    }
+
+    public static Conversa reconstituir(UUID id, UUID clienteId, UUID destinatarioId, String ultimaMensagem,
+                                        Instant dataUltimaMensagem, int naoLidas, StatusAtendimento statusAtendimento,
+                                        UUID operadorId, UUID departamentoId, boolean aguardandoUra, int tentativasUra) {
+        Conversa conversa = new Conversa(id, clienteId, destinatarioId, ultimaMensagem, dataUltimaMensagem, naoLidas,
+                statusAtendimento, operadorId);
+        conversa.departamentoId = departamentoId;
+        conversa.aguardandoUra = aguardandoUra;
+        conversa.tentativasUra = tentativasUra;
+        return conversa;
+    }
+
+    public void iniciarUra() {
+        departamentoId = null;
+        aguardandoUra = true;
+        tentativasUra = 0;
+    }
+
+    public int registrarTentativaInvalida() {
+        return ++tentativasUra;
+    }
+
+    public void definirDepartamento(UUID departamentoId) {
+        this.departamentoId = departamentoId;
+        aguardandoUra = false;
+        tentativasUra = 0;
     }
 
     public void atribuirA(UUID operadorId) {
@@ -92,4 +122,7 @@ public class Conversa {
     public int naoLidas() { return naoLidas; }
     public StatusAtendimento statusAtendimento() { return statusAtendimento; }
     public UUID operadorId() { return operadorId; }
+    public UUID departamentoId() { return departamentoId; }
+    public boolean aguardandoUra() { return aguardandoUra; }
+    public int tentativasUra() { return tentativasUra; }
 }

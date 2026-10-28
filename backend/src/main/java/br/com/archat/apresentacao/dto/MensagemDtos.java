@@ -54,12 +54,12 @@ public final class MensagemDtos {
     }
 
     public record MessageResponse(UUID id, UUID conversationId, UUID campaignId, String content, MediaResponse media,
-                                  SentBy sentBy, Instant timestamp,
+                                  SentBy sentBy, boolean automatic, Instant timestamp,
                                   String priority, String status, BigDecimal cost, int attempts, Instant updatedAt) {
 
         public static MessageResponse de(Mensagem m) {
             return new MessageResponse(m.id(), m.conversaId(), m.campanhaId(), m.conteudo(), MediaResponse.de(m.midia()),
-                    new SentBy(m.remetente() == Remetente.CLIENTE ? "client" : "user"), m.criadaEm(),
+                    new SentBy(m.remetente() == Remetente.CLIENTE ? "client" : "user"), m.automatica(), m.criadaEm(),
                     ApiEnums.prioridade(m.prioridade()), ApiEnums.status(m.status()), m.custo(), m.tentativas(),
                     m.atualizadaEm());
         }

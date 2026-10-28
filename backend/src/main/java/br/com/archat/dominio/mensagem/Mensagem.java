@@ -24,6 +24,7 @@ public class Mensagem {
     private String idExterno;
     private final Instant criadaEm;
     private Instant atualizadaEm;
+    private boolean automatica;
 
     private Mensagem(UUID id, UUID conversaId, UUID campanhaId, Remetente remetente, String conteudo, Midia midia,
                      Prioridade prioridade, StatusMensagem status, BigDecimal custo, int tentativas, String idExterno,
@@ -116,6 +117,23 @@ public class Mensagem {
                 tentativas, idExterno, criadaEm, atualizadaEm);
     }
 
+    public static Mensagem automatica(UUID conversaId, String texto, Instant agora) {
+        Mensagem mensagem = new Mensagem(UUID.randomUUID(), conversaId, null, Remetente.CLIENTE, texto, null,
+                Prioridade.NORMAL, StatusMensagem.ENVIADA, BigDecimal.ZERO.setScale(2), 0, null, agora, agora);
+        mensagem.automatica = true;
+        return mensagem;
+    }
+
+    public static Mensagem reconstituir(UUID id, UUID conversaId, UUID campanhaId, Remetente remetente,
+                                        String conteudo, Midia midia, Prioridade prioridade, StatusMensagem status,
+                                        BigDecimal custo, int tentativas, String idExterno, Instant criadaEm,
+                                        Instant atualizadaEm, boolean automatica) {
+        Mensagem mensagem = reconstituir(id, conversaId, campanhaId, remetente, conteudo, midia, prioridade, status,
+                custo, tentativas, idExterno, criadaEm, atualizadaEm);
+        mensagem.automatica = automatica;
+        return mensagem;
+    }
+
     public String resumo() {
         if (midia == null) {
             return conteudo;
@@ -176,6 +194,7 @@ public class Mensagem {
     public Remetente remetente() { return remetente; }
     public String conteudo() { return conteudo; }
     public Midia midia() { return midia; }
+    public boolean automatica() { return automatica; }
     public Prioridade prioridade() { return prioridade; }
     public StatusMensagem status() { return status; }
     public BigDecimal custo() { return custo; }

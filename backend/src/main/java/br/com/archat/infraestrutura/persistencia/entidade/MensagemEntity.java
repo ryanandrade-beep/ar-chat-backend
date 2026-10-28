@@ -50,6 +50,8 @@ public class MensagemEntity {
     @Column(name = "atualizada_em")
     private Instant atualizadaEm;
 
+    private boolean automatica;
+
     protected MensagemEntity() {
     }
 
@@ -88,6 +90,12 @@ public class MensagemEntity {
         this.urlMidia = midia == null ? null : midia.url();
         this.nomeArquivo = midia == null ? null : midia.nomeArquivo();
     }
+
+    public void definirAutomatica(boolean automatica) {
+        this.automatica = automatica;
+    }
+
+    public boolean isAutomatica() { return automatica; }
 
     public Midia getMidia() {
         return tipoMidia == null ? null : new Midia(tipoMidia, urlMidia, nomeArquivo);

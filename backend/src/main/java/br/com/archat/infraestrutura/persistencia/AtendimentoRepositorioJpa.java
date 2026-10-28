@@ -43,6 +43,12 @@ class AtendimentoRepositorioJpa implements AtendimentoRepositorio {
         return linhas.stream().map(AtendimentoRepositorioJpa::paraDominio).toList();
     }
 
+    @Override
+    public List<Atendimento> listarAbertosNoPeriodo(UUID clienteId, Instant de, Instant ate) {
+        return jpa.findByClienteIdAndAbertoEmGreaterThanEqualAndAbertoEmLessThan(clienteId, de, ate).stream()
+                .map(AtendimentoRepositorioJpa::paraDominio).toList();
+    }
+
     private static Atendimento paraDominio(AtendimentoEntity e) {
         return Atendimento.reconstituir(e.getId(), e.getConversaId(), e.getClienteId(), e.getOrigem(), e.getStatus(),
                 e.getAbertoEm(), e.getPrimeiraRespostaEm(), e.getFinalizadoEm(), e.getMensagensEnviadas(),

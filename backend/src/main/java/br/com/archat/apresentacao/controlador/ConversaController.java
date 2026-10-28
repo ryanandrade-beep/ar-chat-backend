@@ -3,6 +3,7 @@ package br.com.archat.apresentacao.controlador;
 import br.com.archat.aplicacao.atendimento.GerenciarAtendimentoUseCase;
 import br.com.archat.aplicacao.atendimento.ReceberMensagemUseCase;
 import br.com.archat.aplicacao.conversa.ConsultarConversasUseCase;
+import br.com.archat.aplicacao.departamento.GerenciarDepartamentosUseCase;
 import br.com.archat.aplicacao.mensagem.ConsultarMensagensUseCase;
 import br.com.archat.aplicacao.operador.GerenciarOperadoresUseCase;
 import br.com.archat.aplicacao.porta.FiltroMensagens;
@@ -18,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -40,11 +42,13 @@ class ConversaController {
     private final ReceberMensagemUseCase receber;
 
     private final GerenciarOperadoresUseCase operadores;
+    private final GerenciarDepartamentosUseCase departamentos;
 
     ConversaController(ConsultarConversasUseCase conversas, ConsultarMensagensUseCase mensagens,
                        GerenciarAtendimentoUseCase atendimento, ReceberMensagemUseCase receber,
-                       GerenciarOperadoresUseCase operadores) {
+                       GerenciarOperadoresUseCase operadores, GerenciarDepartamentosUseCase departamentos) {
         this.operadores = operadores;
+        this.departamentos = departamentos;
         this.conversas = conversas;
         this.mensagens = mensagens;
         this.atendimento = atendimento;
@@ -56,11 +60,31 @@ class ConversaController {
             + "(waiting, in_progress, on_hold ou finished) e por responsável (assigned: me, none ou o id do operador)")
     List<ConversationResponse> listar(ClienteAutenticado cliente, @RequestParam(required = false) String search,
                                       @RequestParam(required = false) String status,
-                                      @RequestParam(required = false) String assigned) {
+                                      @RequestParam(required = false) String assigned,
+                                      @RequestParam(required = false) UUID department) {
         Map<UUID, String> nomes = nomesDosOperadores(cliente);
+        Map<UUID, String> setores = nomesDosDepartamentos(cliente);
         return conversas.listar(cliente.id(), search, status == null ? null : ApiEnums.atendimento(status)).stream()
                 .filter(r -> responsavelConfere(r.conversa().operadorId(), assigned, cliente))
-                .map(r -> ConversationResponse.de(r, nomes)).toList();
+                .filter(r -> department == null || department.equals(r.conversa().departamentoId()))
+                .map(r -> ConversationResponse.de(r, nomes, setores)).toList();
+    }
+
+    @PutMapping("/{id}/department")
+    @Operation(summary = "Transfere a conversa para outro departamento (departmentId nulo tira o departamento)")
+    ConversationResponse transferirDepartamento(ClienteAutenticado cliente, @PathVariable UUID id,
+                                                @RequestBody DepartmentRequest r) {
+        atendimento.definirDepartamento(cliente.id(), id, r.departmentId());
+        return resposta(cliente, id);
+    }
+
+    record DepartmentRequest(UUID departmentId) {
+    }
+
+    private Map<UUID, String> nomesDosDepartamentos(ClienteAutenticado cliente) {
+        Map<UUID, String> nomes = new java.util.HashMap<>();
+        departamentos.listar(cliente.id()).forEach(d -> nomes.put(d.id(), d.nome()));
+        return nomes;
     }
 
     @PostMapping("/{id}/assign")
@@ -87,7 +111,8 @@ class ConversaController {
     }
 
     private ConversationResponse resposta(ClienteAutenticado cliente, UUID conversaId) {
-        return ConversationResponse.de(conversas.buscar(cliente.id(), conversaId), nomesDosOperadores(cliente));
+        return ConversationResponse.de(conversas.buscar(cliente.id(), conversaId), nomesDosOperadores(cliente),
+                nomesDosDepartamentos(cliente));
     }
 
     @GetMapping("/summary")

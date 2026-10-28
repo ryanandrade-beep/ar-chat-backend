@@ -18,6 +18,8 @@ import br.com.archat.aplicacao.cliente.ReiniciarConsumoMensalUseCase;
 import br.com.archat.aplicacao.conta.CadastrarContaUseCase;
 import br.com.archat.aplicacao.conta.RecuperarSenhaUseCase;
 import br.com.archat.aplicacao.conversa.ConsultarConversasUseCase;
+import br.com.archat.aplicacao.departamento.AtendimentoAutomatico;
+import br.com.archat.aplicacao.departamento.GerenciarDepartamentosUseCase;
 import br.com.archat.aplicacao.destinatario.GerenciarDestinatariosUseCase;
 import br.com.archat.aplicacao.destinatario.ImportarContatosUseCase;
 import br.com.archat.aplicacao.mensagem.AtualizarStatusPeloCanalUseCase;
@@ -40,6 +42,7 @@ import br.com.archat.aplicacao.porta.CodificadorSenha;
 import br.com.archat.aplicacao.porta.ConexaoWhatsApp;
 import br.com.archat.aplicacao.porta.ContaDeAcessoRepositorio;
 import br.com.archat.aplicacao.porta.ConversaRepositorio;
+import br.com.archat.aplicacao.porta.DepartamentoRepositorio;
 import br.com.archat.aplicacao.porta.DestinatarioRepositorio;
 import br.com.archat.aplicacao.porta.EnvioDeEmail;
 import br.com.archat.aplicacao.porta.EnvioMensagemGateway;
@@ -50,6 +53,7 @@ import br.com.archat.aplicacao.porta.PlanoRepositorio;
 import br.com.archat.aplicacao.porta.ServicoToken;
 import br.com.archat.aplicacao.porta.TransacaoRepositorio;
 import br.com.archat.aplicacao.porta.UnidadeDeTrabalho;
+import br.com.archat.aplicacao.relatorio.PainelDoGestorUseCase;
 import br.com.archat.aplicacao.relatorio.RelatorioAtendimentosUseCase;
 import br.com.archat.aplicacao.relatorio.RelatorioCampanhasUseCase;
 import br.com.archat.aplicacao.relatorio.RelatorioFaturamentoUseCase;
@@ -253,16 +257,36 @@ class CasosDeUsoConfig {
     GerenciarAtendimentoUseCase gerenciarAtendimento(ConversaRepositorio conversas, AtendimentoRepositorio atendimentos,
                                                      UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
                                                      MensagemRepositorio mensagens, DestinatarioRepositorio destinatarios,
-                                                     ConexaoWhatsApp canal, OperadorRepositorio operadores) {
+                                                     ConexaoWhatsApp canal, OperadorRepositorio operadores,
+                                                     DepartamentoRepositorio departamentos) {
         return new GerenciarAtendimentoUseCase(conversas, atendimentos, unidadeDeTrabalho, relogio, mensagens,
-                destinatarios, canal, operadores);
+                destinatarios, canal, operadores, departamentos);
     }
 
     @Bean
     ReceberMensagemUseCase receberMensagem(DestinatarioRepositorio destinatarios, ConversaRepositorio conversas,
                                            MensagemRepositorio mensagens, RegistroDeAtendimento atendimentos,
-                                           UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio) {
-        return new ReceberMensagemUseCase(destinatarios, conversas, mensagens, atendimentos, unidadeDeTrabalho, relogio);
+                                           UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
+                                           AtendimentoAutomatico ura, ConexaoWhatsApp canal) {
+        return new ReceberMensagemUseCase(destinatarios, conversas, mensagens, atendimentos, unidadeDeTrabalho, relogio,
+                ura, canal);
+    }
+
+    @Bean
+    PainelDoGestorUseCase painelDoGestor(AtendimentoRepositorio atendimentos, ConversaRepositorio conversas,
+                                         DestinatarioRepositorio destinatarios, ZoneId fuso) {
+        return new PainelDoGestorUseCase(atendimentos, conversas, destinatarios, fuso);
+    }
+
+    @Bean
+    AtendimentoAutomatico atendimentoAutomatico(DepartamentoRepositorio departamentos, MensagemRepositorio mensagens) {
+        return new AtendimentoAutomatico(departamentos, mensagens);
+    }
+
+    @Bean
+    GerenciarDepartamentosUseCase gerenciarDepartamentos(DepartamentoRepositorio departamentos,
+                                                         UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio) {
+        return new GerenciarDepartamentosUseCase(departamentos, unidadeDeTrabalho, relogio);
     }
 
     @Bean
