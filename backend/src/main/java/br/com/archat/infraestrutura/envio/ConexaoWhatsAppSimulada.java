@@ -13,41 +13,41 @@ import java.util.List;
 class ConexaoWhatsAppSimulada implements ConexaoWhatsApp {
 
     @Override
-    public SituacaoConexao situacao() {
+    public SituacaoConexao situacao(java.util.UUID clienteId) {
         return new SituacaoConexao("simulado", true, true, "Envio simulado: nenhuma conexão real é necessária");
     }
 
     @Override
-    public String qrCode() {
+    public String qrCode(java.util.UUID clienteId) {
         throw new RegraDeNegocioException("O envio está em modo simulado; configure archat.envio.provedor=zapi");
     }
 
     @Override
-    public String codigoPorTelefone(String telefone) {
+    public String codigoPorTelefone(java.util.UUID clienteId, String telefone) {
         throw new RegraDeNegocioException("O envio está em modo simulado; configure archat.envio.provedor=zapi");
     }
 
     @Override
-    public void marcarComoLida(String telefoneOuGrupo, String idExterno) {
+    public void marcarComoLida(java.util.UUID clienteId, String telefoneOuGrupo, String idExterno) {
     }
 
     @Override
-    public List<ContatoWhatsApp> listarContatos(int pagina, int tamanhoPagina) {
+    public List<ContatoWhatsApp> listarContatos(java.util.UUID clienteId, int pagina, int tamanhoPagina) {
         return List.of();
     }
 
     @Override
-    public void enviarAvisoDoSistema(String telefone, String texto) {
+    public void enviarAvisoDoSistema(java.util.UUID clienteId, String telefone, String texto) {
         LoggerFactory.getLogger(ConexaoWhatsAppSimulada.class).info("WhatsApp simulado para {}: {}", telefone, texto);
     }
 
     @Override
-    public List<GrupoWhatsApp> listarGrupos(int pagina, int tamanhoPagina) {
+    public List<GrupoWhatsApp> listarGrupos(java.util.UUID clienteId, int pagina, int tamanhoPagina) {
         return List.of();
     }
 
     @Override
-    public void desconectar() {
+    public void desconectar(java.util.UUID clienteId) {
         throw new RegraDeNegocioException("O envio está em modo simulado; não há conexão para desfazer");
     }
 }

@@ -2,6 +2,7 @@ package br.com.archat.infraestrutura.config;
 
 import br.com.archat.aplicacao.administrador.GerenciarAdministradoresUseCase;
 import br.com.archat.aplicacao.cliente.ReiniciarConsumoMensalUseCase;
+import br.com.archat.aplicacao.plano.GerenciarPlanosUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -20,9 +21,12 @@ class TarefasDoSistema implements ApplicationRunner {
     private final GerenciarAdministradoresUseCase administradores;
     private final ReiniciarConsumoMensalUseCase reiniciarConsumoMensal;
     private final ArChatPropriedades.AdministradorInicial administradorInicial;
+    private final GerenciarPlanosUseCase planos;
 
     TarefasDoSistema(GerenciarAdministradoresUseCase administradores,
-                     ReiniciarConsumoMensalUseCase reiniciarConsumoMensal, ArChatPropriedades propriedades) {
+                     ReiniciarConsumoMensalUseCase reiniciarConsumoMensal, ArChatPropriedades propriedades,
+                     GerenciarPlanosUseCase planos) {
+        this.planos = planos;
         this.administradores = administradores;
         this.reiniciarConsumoMensal = reiniciarConsumoMensal;
         this.administradorInicial = propriedades.administradorInicial();
@@ -39,5 +43,6 @@ class TarefasDoSistema implements ApplicationRunner {
     @Scheduled(cron = "0 0 0 1 * *", zone = "America/Sao_Paulo")
     void reiniciarConsumoDoMes() {
         log.info("Consumo mensal zerado para {} cliente(s) pós-pago(s)", reiniciarConsumoMensal.executar());
+        log.info("Mensalidade cobrada de {} assinatura(s)", planos.cobrarMensalidades());
     }
 }

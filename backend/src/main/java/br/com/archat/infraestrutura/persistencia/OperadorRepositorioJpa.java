@@ -21,7 +21,10 @@ class OperadorRepositorioJpa implements OperadorRepositorio {
 
     @Override
     public void salvar(Operador o) {
-        jpa.save(new OperadorEntity(o.id(), o.clienteId(), o.nome(), o.email(), o.senhaHash(), o.ativo(), o.criadoEm()));
+        OperadorEntity entidade = new OperadorEntity(o.id(), o.clienteId(), o.nome(), o.email(), o.senhaHash(), o.ativo(),
+                o.criadoEm());
+        entidade.definirDono(o.dono());
+        jpa.save(entidade);
     }
 
     @Override
@@ -46,6 +49,6 @@ class OperadorRepositorioJpa implements OperadorRepositorio {
 
     private static Operador paraDominio(OperadorEntity e) {
         return Operador.reconstituir(e.getId(), e.getClienteId(), e.getNome(), e.getEmail(), e.getSenhaHash(),
-                e.isAtivo(), e.getCriadoEm());
+                e.isAtivo(), e.getCriadoEm(), e.isDono());
     }
 }

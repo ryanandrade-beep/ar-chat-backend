@@ -14,7 +14,7 @@ skinparam usecase {
 }
 hide stereotype
 actor "Cliente\n(Empresa)" as Cli
-actor "Administrador" as Adm
+actor "Administrador\n(Backoffice)" as Adm
 rectangle "A&R Chat — atendimento e campanhas de marketing" {
   usecase "UC01 Autenticar" <<Apoio>> as UC01
   usecase "UC03 Cadastrar Destinatários\n(contatos e grupos)" <<Cadastro>> as UC03
@@ -26,7 +26,7 @@ rectangle "A&R Chat — atendimento e campanhas de marketing" {
   usecase "UC04 Cadastrar Administradores" <<Cadastro>> as UC04
   usecase "UC07 Movimentar Créditos\ne Limites" <<Movimentação>> as UC07
   usecase "UC09 Relatório de\nFaturamento por Cliente" <<Relatório>> as UC09
-  usecase "UC11 Conectar Canal\n(WhatsApp Web; Business em breve)" <<Apoio>> as UC11
+  usecase "UC11 Conectar Canal\n(QR Code ou código)" <<Apoio>> as UC11
   usecase "Validar Saldo/Limite" <<Apoio>> as VAL
   usecase "Receber Mensagem\ndo Cliente Final" <<Apoio>> as REC
   usecase "UC06 Processar\nFila de Envio" <<Apoio>> as UC06
@@ -46,7 +46,7 @@ Adm --> UC07
 Adm --> UC08
 Adm --> UC09
 Adm --> UC10
-Adm --> UC11
+Cli --> UC11
 UC05 ..> VAL : <<include>>
 UC12 ..> VAL : <<include>>
 REC ..> UC05 : <<extend>>

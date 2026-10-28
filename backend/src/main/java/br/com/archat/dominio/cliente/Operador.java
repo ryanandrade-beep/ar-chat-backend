@@ -19,6 +19,7 @@ public class Operador {
     private String senhaHash;
     private boolean ativo;
     private final Instant criadoEm;
+    private boolean dono;
 
     private Operador(UUID id, UUID clienteId, String nome, String email, String senhaHash, boolean ativo,
                      Instant criadoEm) {
@@ -38,6 +39,20 @@ public class Operador {
     public static Operador reconstituir(UUID id, UUID clienteId, String nome, String email, String senhaHash,
                                         boolean ativo, Instant criadoEm) {
         return new Operador(id, clienteId, nome, email, senhaHash, ativo, criadoEm);
+    }
+
+    public static Operador reconstituir(UUID id, UUID clienteId, String nome, String email, String senhaHash,
+                                        boolean ativo, Instant criadoEm, boolean dono) {
+        Operador operador = new Operador(id, clienteId, nome, email, senhaHash, ativo, criadoEm);
+        operador.dono = dono;
+        return operador;
+    }
+
+    public static Operador perfilDoDono(UUID clienteId, String nome, Instant agora) {
+        Operador operador = new Operador(UUID.randomUUID(), clienteId, nome, "dono-" + clienteId + "@workspace.archat",
+                "!", true, agora);
+        operador.dono = true;
+        return operador;
     }
 
     private static String nomeValido(String nome) {
@@ -67,4 +82,5 @@ public class Operador {
     public String senhaHash() { return senhaHash; }
     public boolean ativo() { return ativo; }
     public Instant criadoEm() { return criadoEm; }
+    public boolean dono() { return dono; }
 }

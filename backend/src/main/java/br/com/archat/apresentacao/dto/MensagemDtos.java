@@ -1,6 +1,7 @@
 package br.com.archat.apresentacao.dto;
 
 import br.com.archat.aplicacao.mensagem.EnviarMensagemUseCase.MensagemEnviada;
+import br.com.archat.dominio.mensagem.ContatoCompartilhado;
 import br.com.archat.dominio.mensagem.Mensagem;
 import br.com.archat.dominio.mensagem.Midia;
 import br.com.archat.dominio.mensagem.Remetente;
@@ -19,7 +20,21 @@ public final class MensagemDtos {
 
     public record SendMessageRequest(UUID conversationId, UUID recipientId,
                                      @Size(max = Mensagem.TAMANHO_MAXIMO) String content, @Valid MediaRequest media,
-                                     @NotBlank String priority, String channel) {
+                                     @NotBlank String priority, String channel, @Valid ContactRequest contact) {
+    }
+
+    public record ContactRequest(@NotBlank String name, @NotBlank String phone) {
+
+        public static ContatoCompartilhado paraDominio(ContactRequest c) {
+            return c == null ? null : new ContatoCompartilhado(c.name(), c.phone());
+        }
+    }
+
+    public record ContactResponse(String name, String phone) {
+
+        public static ContactResponse de(ContatoCompartilhado c) {
+            return c == null ? null : new ContactResponse(c.nome(), c.telefone());
+        }
     }
 
     public record MediaRequest(@NotBlank String type, @NotBlank @Size(max = Midia.TAMANHO_MAXIMO_URL) String url,
@@ -54,12 +69,14 @@ public final class MensagemDtos {
     }
 
     public record MessageResponse(UUID id, UUID conversationId, UUID campaignId, String content, MediaResponse media,
-                                  SentBy sentBy, Instant timestamp,
+                                  ContactResponse contact, UUID operatorId, boolean internal,
+                                  SentBy sentBy, boolean automatic, Instant timestamp,
                                   String priority, String status, BigDecimal cost, int attempts, Instant updatedAt) {
 
         public static MessageResponse de(Mensagem m) {
             return new MessageResponse(m.id(), m.conversaId(), m.campanhaId(), m.conteudo(), MediaResponse.de(m.midia()),
-                    new SentBy(m.remetente() == Remetente.CLIENTE ? "client" : "user"), m.criadaEm(),
+                    ContactResponse.de(m.contato()), m.operadorId(), m.interna(),
+                    new SentBy(m.remetente() == Remetente.CLIENTE ? "client" : "user"), m.automatica(), m.criadaEm(),
                     ApiEnums.prioridade(m.prioridade()), ApiEnums.status(m.status()), m.custo(), m.tentativas(),
                     m.atualizadaEm());
         }

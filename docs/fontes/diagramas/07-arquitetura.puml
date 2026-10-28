@@ -17,16 +17,17 @@ node "Backend Java 21 / Spring Boot" {
     [Portas (interfaces)] as PT
   }
   package "dominio" {
-    [Entidades e regras\nCliente, Mensagem, Plano,\nFilaPrioridade] as DM
+    [Entidades e regras\nCliente, Mensagem, Operador,\nPlano, URA, FilaPrioridade] as DM
   }
   package "infraestrutura" {
     [Repositórios JPA] as JPA
     [Fila em memória\n+ Worker] as FQ
-    [Envio simulado] as EV
+    [Cliente Z-API\n(ou envio simulado)] as EV
     [Token HMAC / BCrypt] as SEC
   }
 }
 database "PostgreSQL 16" as DB
+cloud "Z-API\n(WhatsApp Web)" as ZAPI
 FE --> CT : HTTP/JSON
 CT --> UC
 UC --> DM
@@ -37,4 +38,6 @@ EV ..|> PT
 SEC ..|> PT
 JPA --> DB
 FQ --> UC : processa mensagens
+EV --> ZAPI : send-text, send-image,\nsend-contact...
+ZAPI --> CT : webhooks
 @enduml

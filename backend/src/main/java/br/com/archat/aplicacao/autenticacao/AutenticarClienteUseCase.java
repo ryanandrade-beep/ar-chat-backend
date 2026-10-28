@@ -59,6 +59,7 @@ public class AutenticarClienteUseCase {
             return abrirSessao(clientes.buscarPorId(conta.get().clienteId()).orElseThrow(() -> invalido));
         }
         Operador operador = (operadores == null ? java.util.Optional.<Operador>empty() : operadores.buscarPorEmail(normalizado))
+                .filter(o -> !o.dono())
                 .orElseThrow(() -> invalido);
         if (senha == null || !codificador.confere(senha, operador.senhaHash())) {
             throw invalido;

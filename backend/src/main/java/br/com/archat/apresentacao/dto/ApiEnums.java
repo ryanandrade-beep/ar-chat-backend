@@ -27,7 +27,8 @@ public final class ApiEnums {
             StatusMensagem.LIDA, "read", StatusMensagem.FALHA, "failed");
     private static final Map<TipoTransacao, String> TRANSACOES = Map.of(
             TipoTransacao.CREDITO, "credit", TipoTransacao.DEBITO, "debit",
-            TipoTransacao.ESTORNO, "refund", TipoTransacao.AJUSTE_LIMITE, "limit_adjustment");
+            TipoTransacao.ESTORNO, "refund", TipoTransacao.AJUSTE_LIMITE, "limit_adjustment",
+            TipoTransacao.MENSALIDADE, "monthly_fee");
 
     private static final Map<StatusAtendimento, String> ATENDIMENTOS = Map.of(
             StatusAtendimento.AGUARDANDO, "waiting", StatusAtendimento.EM_ANDAMENTO, "in_progress",

@@ -3,6 +3,7 @@ package br.com.archat.aplicacao.atendimento;
 import br.com.archat.aplicacao.porta.AtendimentoRepositorio;
 import br.com.archat.aplicacao.porta.ConexaoWhatsApp;
 import br.com.archat.aplicacao.porta.ConversaRepositorio;
+import br.com.archat.aplicacao.porta.DepartamentoRepositorio;
 import br.com.archat.aplicacao.porta.DestinatarioRepositorio;
 import br.com.archat.aplicacao.porta.FiltroMensagens;
 import br.com.archat.aplicacao.porta.MensagemRepositorio;
@@ -34,16 +35,18 @@ public class GerenciarAtendimentoUseCase {
     private final DestinatarioRepositorio destinatarios;
     private final ConexaoWhatsApp canal;
     private final OperadorRepositorio operadores;
+    private final DepartamentoRepositorio departamentos;
 
     public GerenciarAtendimentoUseCase(ConversaRepositorio conversas, AtendimentoRepositorio atendimentos,
                                        UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio) {
-        this(conversas, atendimentos, unidadeDeTrabalho, relogio, null, null, null, null);
+        this(conversas, atendimentos, unidadeDeTrabalho, relogio, null, null, null, null, null);
     }
 
     public GerenciarAtendimentoUseCase(ConversaRepositorio conversas, AtendimentoRepositorio atendimentos,
                                        UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
                                        MensagemRepositorio mensagens, DestinatarioRepositorio destinatarios,
-                                       ConexaoWhatsApp canal, OperadorRepositorio operadores) {
+                                       ConexaoWhatsApp canal, OperadorRepositorio operadores,
+                                       DepartamentoRepositorio departamentos) {
         this.conversas = conversas;
         this.atendimentos = atendimentos;
         this.unidadeDeTrabalho = unidadeDeTrabalho;
@@ -52,6 +55,21 @@ public class GerenciarAtendimentoUseCase {
         this.destinatarios = destinatarios;
         this.canal = canal;
         this.operadores = operadores;
+        this.departamentos = departamentos;
+    }
+
+    public Conversa definirDepartamento(UUID clienteId, UUID conversaId, UUID departamentoId) {
+        return unidadeDeTrabalho.executar(() -> {
+            Conversa conversa = daEmpresa(clienteId, conversaId);
+            if (departamentoId != null) {
+                departamentos.buscarPorId(departamentoId)
+                        .filter(d -> d.pertenceA(clienteId) && d.ativo())
+                        .orElseThrow(() -> new RegraDeNegocioException("Departamento inválido ou inativo"));
+            }
+            conversa.definirDepartamento(departamentoId);
+            conversas.salvar(conversa);
+            return conversa;
+        });
     }
 
     public Conversa atribuir(UUID clienteId, UUID conversaId, UUID operadorId, UUID solicitante) {
@@ -104,7 +122,7 @@ public class GerenciarAtendimentoUseCase {
                     .filter(m -> m.remetente() == Remetente.DESTINATARIO && m.idExterno() != null)
                     .max(Comparator.comparing(Mensagem::criadaEm))
                     .ifPresent(ultima -> destinatarios.buscarPorId(conversa.destinatarioId())
-                            .ifPresent(d -> canal.marcarComoLida(d.telefone(), ultima.idExterno())));
+                            .ifPresent(d -> canal.marcarComoLida(clienteId, d.telefone(), ultima.idExterno())));
         } catch (RuntimeException e) {
         }
     }

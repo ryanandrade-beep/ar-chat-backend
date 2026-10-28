@@ -53,8 +53,14 @@ public record Campanha(UUID id, UUID clienteId, String nome, String conteudo, Mi
 
     public static Campanha nova(UUID clienteId, String nome, String conteudo, Midia midia, Prioridade prioridade,
                                 int totalDestinatarios, Instant agora) {
-        BigDecimal custoTotal = prioridade == null ? BigDecimal.ZERO
-                : prioridade.custo().multiply(BigDecimal.valueOf(totalDestinatarios));
+        return nova(clienteId, nome, conteudo, midia, prioridade, prioridade == null ? null : prioridade.custo(),
+                totalDestinatarios, agora);
+    }
+
+    public static Campanha nova(UUID clienteId, String nome, String conteudo, Midia midia, Prioridade prioridade,
+                                BigDecimal precoUnitario, int totalDestinatarios, Instant agora) {
+        BigDecimal custoTotal = prioridade == null || precoUnitario == null ? BigDecimal.ZERO
+                : precoUnitario.multiply(BigDecimal.valueOf(totalDestinatarios));
         return new Campanha(UUID.randomUUID(), clienteId, nome, conteudo, midia, prioridade, totalDestinatarios, custoTotal, agora);
     }
 

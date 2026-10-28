@@ -1,5 +1,6 @@
 package br.com.archat.infraestrutura.persistencia.entidade;
 
+import br.com.archat.dominio.mensagem.ContatoCompartilhado;
 import br.com.archat.dominio.mensagem.Midia;
 import br.com.archat.dominio.mensagem.Prioridade;
 import br.com.archat.dominio.mensagem.TipoMidia;
@@ -50,6 +51,17 @@ public class MensagemEntity {
     @Column(name = "atualizada_em")
     private Instant atualizadaEm;
 
+    private boolean automatica;
+
+    @Column(name = "contato_nome")
+    private String contatoNome;
+    @Column(name = "contato_telefone")
+    private String contatoTelefone;
+
+    @Column(name = "operador_id")
+    private UUID operadorId;
+    private boolean interna;
+
     protected MensagemEntity() {
     }
 
@@ -87,6 +99,29 @@ public class MensagemEntity {
         this.tipoMidia = midia == null ? null : midia.tipo();
         this.urlMidia = midia == null ? null : midia.url();
         this.nomeArquivo = midia == null ? null : midia.nomeArquivo();
+    }
+
+    public void definirAutomatica(boolean automatica) {
+        this.automatica = automatica;
+    }
+
+    public boolean isAutomatica() { return automatica; }
+
+    public void definirAutoria(UUID operadorId, boolean interna) {
+        this.operadorId = operadorId;
+        this.interna = interna;
+    }
+
+    public UUID getOperadorId() { return operadorId; }
+    public boolean isInterna() { return interna; }
+
+    public void definirContato(ContatoCompartilhado contato) {
+        this.contatoNome = contato == null ? null : contato.nome();
+        this.contatoTelefone = contato == null ? null : contato.telefone();
+    }
+
+    public ContatoCompartilhado getContato() {
+        return contatoNome == null ? null : new ContatoCompartilhado(contatoNome, contatoTelefone);
     }
 
     public Midia getMidia() {

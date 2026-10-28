@@ -1,0 +1,68 @@
+@startuml
+!pragma layout smetana
+!include skin.iuml
+title Diagrama de Classes — Planos, URA e Canal por Empresa
+hide empty members
+skinparam classAttributeIconSize 0
+
+class Cliente
+class Conversa
+class Plano {
+  - id : UUID
+  - nome : String
+  - mensalidade : Decimal
+  - operadoresIncluidos : Integer
+  - precoNormal : Decimal
+  - precoUrgente : Decimal
+  - ativo : Boolean
+  + custo(p : Prioridade) : Decimal
+}
+class Assinatura {
+  - situacao : SituacaoAssinatura
+  - inicio : DateTime
+  - ultimaCobranca : DateTime
+  + trocarPlano(planoId, agora) : void
+  + registrarCobranca(agora) : void
+  + registrarAtraso() : void
+}
+class Departamento {
+  - id : UUID
+  - nome : String
+  - ativo : Boolean
+  + alterar(nome, ativo) : void
+}
+class ConfiguracaoUra {
+  - ativa : Boolean
+  - mensagemBoasVindas : String
+  - mensagemPergunta : String
+  - maximoTentativas : Integer
+  - departamentoPadraoId : UUID
+  - ignorarGrupos : Boolean
+  + boasVindas(nomeContato) : String
+  + menu(departamentos) : String
+  + {static} escolha(resposta, departamentos) : Departamento
+}
+class InstanciaWhatsApp <<valor>> {
+  - instancia : String
+  - token : String
+  - vinculadaEm : DateTime
+  + tokenMascarado() : String
+}
+class Arquivo <<valor>> {
+  - id : UUID
+  - nome : String
+  - tipoMime : String
+  - conteudo : byte[]
+  + tipoDeMidia() : TipoMidia
+  + comoDataUri() : String
+}
+
+Cliente "1" -- "0..1" Assinatura
+Assinatura "0..*" --> "1" Plano
+Cliente "1" -- "0..*" Departamento
+Cliente "1" -- "1" ConfiguracaoUra
+ConfiguracaoUra ..> Departamento : padrão / menu
+Conversa "0..*" --> "0..1" Departamento
+Cliente "1" -- "0..1" InstanciaWhatsApp
+Cliente "1" -- "0..*" Arquivo
+@enduml

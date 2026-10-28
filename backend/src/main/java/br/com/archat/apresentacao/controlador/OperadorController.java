@@ -52,6 +52,9 @@ class OperadorController {
     @Operation(summary = "Altera o nome e ativa ou desativa o operador (somente o dono)")
     OperatorResponse alterar(ClienteAutenticado cliente, @PathVariable UUID id, @Valid @RequestBody UpdateOperatorRequest r) {
         cliente.exigirGestor();
+        if (operadores.buscar(cliente.id(), id).dono()) {
+            throw new br.com.archat.dominio.excecao.RegraDeNegocioException("O perfil do responsável não pode ser alterado aqui");
+        }
         return OperatorResponse.de(operadores.alterar(cliente.id(), id, r.name(), r.active()));
     }
 
@@ -60,6 +63,9 @@ class OperadorController {
     @Operation(summary = "Define uma nova senha para o operador (somente o dono)")
     void redefinirSenha(ClienteAutenticado cliente, @PathVariable UUID id, @Valid @RequestBody PasswordRequest r) {
         cliente.exigirGestor();
+        if (operadores.buscar(cliente.id(), id).dono()) {
+            throw new br.com.archat.dominio.excecao.RegraDeNegocioException("O responsável troca a senha pela própria conta");
+        }
         operadores.redefinirSenha(cliente.id(), id, r.password());
     }
 
@@ -72,10 +78,10 @@ class OperadorController {
     record PasswordRequest(@NotBlank String password) {
     }
 
-    record OperatorResponse(UUID id, String name, String email, boolean active, Instant createdAt) {
+    record OperatorResponse(UUID id, String name, String email, boolean active, Instant createdAt, boolean owner) {
 
         static OperatorResponse de(Operador o) {
-            return new OperatorResponse(o.id(), o.nome(), o.email(), o.ativo(), o.criadoEm());
+            return new OperatorResponse(o.id(), o.nome(), o.dono() ? null : o.email(), o.ativo(), o.criadoEm(), o.dono());
         }
     }
 }

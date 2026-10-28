@@ -7,8 +7,8 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * Arquivo enviado ou recebido numa mensagem. O arquivo não é guardado pelo sistema: guarda-se apenas o link
- * público (https) de onde o canal o baixa. {@code nomeArquivo} é usado só nos documentos.
+ * Arquivo enviado ou recebido numa mensagem: um arquivo guardado pelo sistema ({@code /media/{id}}, enviado ao
+ * canal em base64) ou um link público (https), como os das mídias recebidas. {@code nomeArquivo} é usado nos documentos.
  */
 public record Midia(TipoMidia tipo, String url, String nomeArquivo) {
 
@@ -23,9 +23,9 @@ public record Midia(TipoMidia tipo, String url, String nomeArquivo) {
             throw new RegraDeNegocioException("O link da mídia é obrigatório");
         }
         url = url.strip();
-        if (url.length() > TAMANHO_MAXIMO_URL || !(url.startsWith("https://") || url.startsWith("http://"))) {
-            throw new RegraDeNegocioException("Informe o link público (http ou https) da mídia, com até "
-                    + TAMANHO_MAXIMO_URL + " caracteres");
+        boolean arquivoInterno = url.matches("/media/[0-9a-fA-F-]{36}");
+        if (url.length() > TAMANHO_MAXIMO_URL || !(arquivoInterno || url.startsWith("https://") || url.startsWith("http://"))) {
+            throw new RegraDeNegocioException("Envie um arquivo ou informe o link público (http ou https) da mídia");
         }
         nomeArquivo = nomeArquivo == null || nomeArquivo.isBlank() ? null : nomeArquivo.strip();
         if (nomeArquivo != null && nomeArquivo.length() > 255) {

@@ -1,25 +1,29 @@
 package br.com.archat.aplicacao.porta;
 
 import java.util.List;
+import java.util.UUID;
 
-/** Conexão do número de WhatsApp usado pelo canal de envio. */
+/**
+ * Conexão do WhatsApp de cada empresa. {@code clienteId} identifica a empresa (a instância dela na Z-API);
+ * nulo usa a instância da própria plataforma (ex.: código de recuperação de senha).
+ */
 public interface ConexaoWhatsApp {
 
-    SituacaoConexao situacao();
+    SituacaoConexao situacao(UUID clienteId);
 
-    String qrCode();
+    String qrCode(UUID clienteId);
 
-    String codigoPorTelefone(String telefone);
+    String codigoPorTelefone(UUID clienteId, String telefone);
 
-    void marcarComoLida(String telefoneOuGrupo, String idExterno);
+    void marcarComoLida(UUID clienteId, String telefoneOuGrupo, String idExterno);
 
-    void enviarAvisoDoSistema(String telefone, String texto);
+    void enviarAvisoDoSistema(UUID clienteId, String telefone, String texto);
 
-    void desconectar();
+    void desconectar(UUID clienteId);
 
-    List<GrupoWhatsApp> listarGrupos(int pagina, int tamanhoPagina);
+    List<GrupoWhatsApp> listarGrupos(UUID clienteId, int pagina, int tamanhoPagina);
 
-    List<ContatoWhatsApp> listarContatos(int pagina, int tamanhoPagina);
+    List<ContatoWhatsApp> listarContatos(UUID clienteId, int pagina, int tamanhoPagina);
 
     record GrupoWhatsApp(String id, String nome) {
     }

@@ -24,82 +24,93 @@ class ClienteZApi {
 
     ClienteZApi(ArChatPropriedades propriedades) {
         ArChatPropriedades.ZApi zapi = propriedades.zapi();
-        if (vazio(zapi.instancia()) || vazio(zapi.token()) || vazio(zapi.clientToken())) {
-            throw new IllegalStateException("Com archat.envio.provedor=zapi, informe ARCHAT_ZAPI_INSTANCIA, ARCHAT_ZAPI_TOKEN e ARCHAT_ZAPI_CLIENT_TOKEN");
+        if (vazio(zapi.clientToken())) {
+            throw new IllegalStateException("Com archat.envio.provedor=zapi, informe ARCHAT_ZAPI_CLIENT_TOKEN (token da conta Z-API)");
         }
         SimpleClientHttpRequestFactory fabrica = new SimpleClientHttpRequestFactory();
         fabrica.setConnectTimeout(zapi.timeout());
         fabrica.setReadTimeout(zapi.timeout());
         this.http = RestClient.builder()
-                .baseUrl(zapi.urlBase() + "/instances/" + zapi.instancia() + "/token/" + zapi.token())
+                .baseUrl(zapi.urlBase())
                 .defaultHeader("Client-Token", zapi.clientToken())
                 .requestFactory(fabrica)
                 .build();
     }
 
-    RespostaEnvio enviarTexto(String telefone, String mensagem) {
-        return http.post().uri("/send-text").contentType(MediaType.APPLICATION_JSON)
+    RespostaEnvio enviarTexto(Credenciais c, String telefone, String mensagem) {
+        return http.post().uri(c.prefixo() + "/send-text").contentType(MediaType.APPLICATION_JSON)
                 .body(new EnvioTexto(telefone, mensagem))
                 .retrieve().body(RespostaEnvio.class);
     }
 
-    RespostaEnvio enviarImagem(String telefone, String link, String legenda) {
-        return post("/send-image", new EnvioImagem(telefone, link, legenda));
+    RespostaEnvio enviarImagem(Credenciais c, String telefone, String link, String legenda) {
+        return post(c, "/send-image", new EnvioImagem(telefone, link, legenda));
     }
 
-    RespostaEnvio enviarDocumento(String telefone, String link, String extensao, String nomeArquivo, String legenda) {
-        return http.post().uri("/send-document/{extensao}", extensao).contentType(MediaType.APPLICATION_JSON)
+    RespostaEnvio enviarDocumento(Credenciais c, String telefone, String link, String extensao, String nomeArquivo, String legenda) {
+        return http.post().uri(c.prefixo() + "/send-document/{extensao}", extensao).contentType(MediaType.APPLICATION_JSON)
                 .body(new EnvioDocumento(telefone, link, nomeArquivo, legenda))
                 .retrieve().body(RespostaEnvio.class);
     }
 
-    RespostaEnvio enviarAudio(String telefone, String link) {
-        return post("/send-audio", new EnvioAudio(telefone, link));
+    RespostaEnvio enviarAudio(Credenciais c, String telefone, String link) {
+        return post(c, "/send-audio", new EnvioAudio(telefone, link));
     }
 
-    RespostaEnvio enviarVideo(String telefone, String link, String legenda) {
-        return post("/send-video", new EnvioVideo(telefone, link, legenda));
+    RespostaEnvio enviarVideo(Credenciais c, String telefone, String link, String legenda) {
+        return post(c, "/send-video", new EnvioVideo(telefone, link, legenda));
     }
 
-    void lerMensagem(String telefone, String messageId) {
-        http.post().uri("/read-message").contentType(MediaType.APPLICATION_JSON)
+    void lerMensagem(Credenciais c, String telefone, String messageId) {
+        http.post().uri(c.prefixo() + "/read-message").contentType(MediaType.APPLICATION_JSON)
                 .body(new LeituraMensagem(telefone, messageId))
                 .retrieve().toBodilessEntity();
     }
 
     @SuppressWarnings("unchecked")
-    Map<String, Object> codigoPorTelefone(String telefone) {
-        return http.get().uri("/phone-code/{telefone}", telefone).retrieve().body(Map.class);
+    Map<String, Object> codigoPorTelefone(Credenciais c, String telefone) {
+        return http.get().uri(c.prefixo() + "/phone-code/{telefone}", telefone).retrieve().body(Map.class);
     }
 
-    private RespostaEnvio post(String rota, Object corpo) {
-        return http.post().uri(rota).contentType(MediaType.APPLICATION_JSON).body(corpo)
+    private RespostaEnvio post(Credenciais c, String rota, Object corpo) {
+        return http.post().uri(c.prefixo() + rota).contentType(MediaType.APPLICATION_JSON).body(corpo)
                 .retrieve().body(RespostaEnvio.class);
     }
 
-    RespostaStatus status() {
-        return http.get().uri("/status").retrieve().body(RespostaStatus.class);
+    RespostaEnvio enviarContato(Credenciais c, String telefone, String nome, String telefoneDoContato) {
+        return post(c, "/send-contact", new EnvioContato(telefone, nome, telefoneDoContato));
+    }
+
+    RespostaStatus status(Credenciais c) {
+        return http.get().uri(c.prefixo() + "/status").retrieve().body(RespostaStatus.class);
     }
 
     @SuppressWarnings("unchecked")
-    Map<String, Object> qrCodeImagem() {
-        return http.get().uri("/qr-code/image").retrieve().body(Map.class);
+    Map<String, Object> qrCodeImagem(Credenciais c) {
+        return http.get().uri(c.prefixo() + "/qr-code/image").retrieve().body(Map.class);
     }
 
-    List<GrupoZApi> grupos(int pagina, int tamanhoPagina) {
-        GrupoZApi[] grupos = http.get().uri("/groups?page={pagina}&pageSize={tamanho}", pagina, tamanhoPagina)
+    List<GrupoZApi> grupos(Credenciais c, int pagina, int tamanhoPagina) {
+        GrupoZApi[] grupos = http.get().uri(c.prefixo() + "/groups?page={pagina}&pageSize={tamanho}", pagina, tamanhoPagina)
                 .retrieve().body(GrupoZApi[].class);
         return grupos == null ? List.of() : List.of(grupos);
     }
 
-    List<ContatoZApi> contatos(int pagina, int tamanhoPagina) {
-        ContatoZApi[] contatos = http.get().uri("/contacts?page={pagina}&pageSize={tamanho}", pagina, tamanhoPagina)
+    List<ContatoZApi> contatos(Credenciais c, int pagina, int tamanhoPagina) {
+        ContatoZApi[] contatos = http.get().uri(c.prefixo() + "/contacts?page={pagina}&pageSize={tamanho}", pagina, tamanhoPagina)
                 .retrieve().body(ContatoZApi[].class);
         return contatos == null ? List.of() : List.of(contatos);
     }
 
-    void desconectar() {
-        http.get().uri("/disconnect").retrieve().toBodilessEntity();
+    void desconectar(Credenciais c) {
+        http.get().uri(c.prefixo() + "/disconnect").retrieve().toBodilessEntity();
+    }
+
+    record Credenciais(String instancia, String token) {
+
+        String prefixo() {
+            return "/instances/" + instancia + "/token/" + token;
+        }
     }
 
     private static boolean vazio(String valor) {
@@ -122,6 +133,9 @@ class ClienteZApi {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     record EnvioVideo(String phone, String video, String caption) {
+    }
+
+    record EnvioContato(String phone, String contactName, String contactPhone) {
     }
 
     record LeituraMensagem(String phone, String messageId) {

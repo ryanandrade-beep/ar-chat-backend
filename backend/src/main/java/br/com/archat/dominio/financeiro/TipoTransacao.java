@@ -4,5 +4,6 @@ public enum TipoTransacao {
     CREDITO,
     DEBITO,
     ESTORNO,
-    AJUSTE_LIMITE
+    AJUSTE_LIMITE,
+    MENSALIDADE
 }

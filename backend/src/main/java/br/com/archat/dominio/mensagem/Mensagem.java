@@ -24,6 +24,10 @@ public class Mensagem {
     private String idExterno;
     private final Instant criadaEm;
     private Instant atualizadaEm;
+    private boolean automatica;
+    private UUID operadorId;
+    private boolean interna;
+    private ContatoCompartilhado contato;
 
     private Mensagem(UUID id, UUID conversaId, UUID campanhaId, Remetente remetente, String conteudo, Midia midia,
                      Prioridade prioridade, StatusMensagem status, BigDecimal custo, int tentativas, String idExterno,
@@ -54,13 +58,22 @@ public class Mensagem {
 
     public static Mensagem novaDoCliente(UUID conversaId, UUID campanhaId, String conteudo, Midia midia,
                                          Prioridade prioridade, Instant agora) {
+        return novaDoCliente(conversaId, campanhaId, conteudo, midia, prioridade,
+                prioridade == null ? null : prioridade.custo(), agora);
+    }
+
+    public static Mensagem novaDoCliente(UUID conversaId, UUID campanhaId, String conteudo, Midia midia,
+                                         Prioridade prioridade, BigDecimal custo, Instant agora) {
         validarConteudo(conteudo, midia);
         if (prioridade == null) {
             throw new RegraDeNegocioException("A prioridade é obrigatória");
         }
+        if (custo == null || custo.signum() <= 0) {
+            throw new RegraDeNegocioException("Preço da mensagem inválido");
+        }
         return new Mensagem(UUID.randomUUID(), conversaId, campanhaId, Remetente.CLIENTE,
                 conteudo == null ? "" : conteudo.strip(), midia, prioridade, StatusMensagem.ENFILEIRADA,
-                prioridade.custo(), 0, null, agora, agora);
+                custo, 0, null, agora, agora);
     }
 
     public static void validarConteudo(String conteudo, Midia midia) {
@@ -107,7 +120,75 @@ public class Mensagem {
                 tentativas, idExterno, criadaEm, atualizadaEm);
     }
 
+    public static Mensagem compartilhandoContato(UUID conversaId, ContatoCompartilhado contato, Prioridade prioridade,
+                                                 BigDecimal custo, Instant agora) {
+        if (prioridade == null || custo == null || custo.signum() <= 0) {
+            throw new RegraDeNegocioException("A prioridade é obrigatória");
+        }
+        Mensagem mensagem = new Mensagem(UUID.randomUUID(), conversaId, null, Remetente.CLIENTE, "", null, prioridade,
+                StatusMensagem.ENFILEIRADA, custo, 0, null, agora, agora);
+        mensagem.contato = java.util.Objects.requireNonNull(contato);
+        return mensagem;
+    }
+
+    public static Mensagem contatoRecebido(UUID conversaId, ContatoCompartilhado contato, String idExterno, Instant quando) {
+        Mensagem mensagem = new Mensagem(UUID.randomUUID(), conversaId, null, Remetente.DESTINATARIO, "", null,
+                Prioridade.NORMAL, StatusMensagem.ENTREGUE, BigDecimal.ZERO.setScale(2), 0, idExterno, quando, quando);
+        mensagem.contato = contato;
+        return mensagem;
+    }
+
+    public Mensagem comContato(ContatoCompartilhado contato) {
+        this.contato = contato;
+        return this;
+    }
+
+    public static Mensagem notaInterna(UUID conversaId, String texto, UUID operadorId, Instant agora) {
+        if (texto == null || texto.isBlank()) {
+            throw new RegraDeNegocioException("Escreva a nota");
+        }
+        if (texto.length() > TAMANHO_MAXIMO) {
+            throw new RegraDeNegocioException("A nota deve ter no máximo " + TAMANHO_MAXIMO + " caracteres");
+        }
+        Mensagem nota = new Mensagem(UUID.randomUUID(), conversaId, null, Remetente.CLIENTE, texto.strip(), null,
+                Prioridade.NORMAL, StatusMensagem.ENVIADA, BigDecimal.ZERO.setScale(2), 0, null, agora, agora);
+        nota.interna = true;
+        nota.operadorId = operadorId;
+        return nota;
+    }
+
+    public Mensagem escritaPor(UUID operadorId) {
+        this.operadorId = operadorId;
+        return this;
+    }
+
+    public Mensagem comAutoria(UUID operadorId, boolean interna) {
+        this.operadorId = operadorId;
+        this.interna = interna;
+        return this;
+    }
+
+    public static Mensagem automatica(UUID conversaId, String texto, Instant agora) {
+        Mensagem mensagem = new Mensagem(UUID.randomUUID(), conversaId, null, Remetente.CLIENTE, texto, null,
+                Prioridade.NORMAL, StatusMensagem.ENVIADA, BigDecimal.ZERO.setScale(2), 0, null, agora, agora);
+        mensagem.automatica = true;
+        return mensagem;
+    }
+
+    public static Mensagem reconstituir(UUID id, UUID conversaId, UUID campanhaId, Remetente remetente,
+                                        String conteudo, Midia midia, Prioridade prioridade, StatusMensagem status,
+                                        BigDecimal custo, int tentativas, String idExterno, Instant criadaEm,
+                                        Instant atualizadaEm, boolean automatica) {
+        Mensagem mensagem = reconstituir(id, conversaId, campanhaId, remetente, conteudo, midia, prioridade, status,
+                custo, tentativas, idExterno, criadaEm, atualizadaEm);
+        mensagem.automatica = automatica;
+        return mensagem;
+    }
+
     public String resumo() {
+        if (contato != null) {
+            return "[Contato] " + contato.nome();
+        }
         if (midia == null) {
             return conteudo;
         }
@@ -167,6 +248,10 @@ public class Mensagem {
     public Remetente remetente() { return remetente; }
     public String conteudo() { return conteudo; }
     public Midia midia() { return midia; }
+    public boolean automatica() { return automatica; }
+    public UUID operadorId() { return operadorId; }
+    public boolean interna() { return interna; }
+    public ContatoCompartilhado contato() { return contato; }
     public Prioridade prioridade() { return prioridade; }
     public StatusMensagem status() { return status; }
     public BigDecimal custo() { return custo; }

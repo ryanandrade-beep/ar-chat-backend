@@ -110,6 +110,11 @@ final class Fakes {
                     .filter(a -> !a.finalizadoEm().isBefore(de) && a.finalizadoEm().isBefore(ate))
                     .toList();
         }
+        public List<Atendimento> listarAbertosNoPeriodo(UUID clienteId, Instant de, Instant ate) {
+            return dados.values().stream()
+                    .filter(a -> a.clienteId().equals(clienteId) && !a.abertoEm().isBefore(de) && a.abertoEm().isBefore(ate))
+                    .toList();
+        }
     }
 
     static class Conversas implements ConversaRepositorio {

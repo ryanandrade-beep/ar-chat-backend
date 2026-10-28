@@ -37,7 +37,7 @@ public class ImportarContatosUseCase {
             throw new RegraDeNegocioException("Use página a partir de 1 e tamanho de 1 a 200");
         }
         Set<String> cadastrados = telefonesCadastrados(clienteId);
-        return conexao.listarContatos(pagina, tamanhoPagina).stream()
+        return conexao.listarContatos(clienteId, pagina, tamanhoPagina).stream()
                 .map(c -> new ContatoDaAgenda(c.telefone(), c.nome(), variacoes(c.telefone()).stream().anyMatch(cadastrados::contains)))
                 .toList();
     }

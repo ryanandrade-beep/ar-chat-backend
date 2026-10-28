@@ -139,6 +139,26 @@
     {
       "key": "monthStart",
       "value": ""
+    },
+    {
+      "key": "mediaMessageId",
+      "value": ""
+    },
+    {
+      "key": "accountEmail",
+      "value": ""
+    },
+    {
+      "key": "operatorId",
+      "value": ""
+    },
+    {
+      "key": "planId",
+      "value": ""
+    },
+    {
+      "key": "departmentId",
+      "value": ""
     }
   ],
   "item": [
@@ -231,6 +251,191 @@
                 "exec": [
                   "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
                   "pm.collectionVariables.set(\"clientToken\", pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar conta (e-mail e senha)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Hortifruti {{$randomInt}}\",\n  \"email\": \"conta{{$timestamp}}@exemplo.com\",\n  \"phone\": \"44999990000\",\n  \"documentId\": \"{{newDocumentId}}\",\n  \"documentType\": \"CPF\",\n  \"password\": \"oferta2026\",\n  \"passwordConfirmation\": \"oferta2026\",\n  \"acceptTerms\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Cria a conta pela tela \"Criar conta\": plano pré-pago, sem saldo. acceptTerms precisa ser true."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"accountEmail\", JSON.parse(pm.request.body.raw).email);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Entrar com e-mail e senha",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{accountEmail}}\",\n  \"password\": \"oferta2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Login do painel."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Esqueci minha senha",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{accountEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "O código de 6 dígitos aparece no log do backend (não há servidor de e-mail). Responde 202 mesmo se o e-mail não existir."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 202\", () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Redefinir senha com o código",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{accountEmail}}\",\n  \"code\": \"000000\",\n  \"password\": \"nova2026senha\",\n  \"passwordConfirmation\": \"nova2026senha\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "Troque \"code\" pelo código do log. Vale por 15 minutos e 5 tentativas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204 (código certo) ou 422\", () => pm.expect([204, 422]).to.include(pm.response.code));"
                 ]
               }
             }
@@ -1729,6 +1934,365 @@
           "description": "RF4 – valida saldo/limite, cobra e enfileira."
         },
         {
+          "name": "Enviar mídia",
+          "item": [
+            {
+              "name": "Enviar imagem com legenda",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/messages",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"conversationId\": \"{{conversationId}}\",\n  \"content\": \"Encarte de ofertas (teste A&R Chat)\",\n  \"priority\": \"normal\",\n  \"media\": {\n    \"type\": \"image\",\n    \"url\": \"https://www.z-api.io/wp-content/themes/z-api/dist/images/logo.svg\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Z-API: POST /send-image {phone, image, caption}. Com mídia, content é a legenda (opcional)."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                      "pm.test(\"Custo 0.25 (mesmo preço do texto)\", () => pm.expect(pm.response.json().cost).to.eql(0.25));",
+                      "pm.collectionVariables.set(\"mediaMessageId\", pm.response.json().id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Enviar documento (PDF)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/messages",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"conversationId\": \"{{conversationId}}\",\n  \"content\": \"Tabela de preços\",\n  \"priority\": \"normal\",\n  \"media\": {\n    \"type\": \"document\",\n    \"url\": \"https://expoforest.com.br/wp-content/uploads/2017/05/exemplo.pdf\",\n    \"fileName\": \"tabela-de-precos.pdf\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Z-API: POST /send-document/{extensão} {phone, document, fileName, caption}. A extensão vem do fileName ou do link."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                      "pm.test(\"Custo 0.25 (mesmo preço do texto)\", () => pm.expect(pm.response.json().cost).to.eql(0.25));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Enviar áudio",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/messages",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"conversationId\": \"{{conversationId}}\",\n  \"priority\": \"normal\",\n  \"media\": {\n    \"type\": \"audio\",\n    \"url\": \"https://www.w3schools.com/html/horse.mp3\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Z-API: POST /send-audio {phone, audio}. Áudio não aceita legenda."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                      "pm.test(\"Custo 0.25 (mesmo preço do texto)\", () => pm.expect(pm.response.json().cost).to.eql(0.25));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Enviar vídeo",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/messages",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"conversationId\": \"{{conversationId}}\",\n  \"content\": \"Vídeo da promoção\",\n  \"priority\": \"normal\",\n  \"media\": {\n    \"type\": \"video\",\n    \"url\": \"https://www.w3schools.com/html/mov_bbb.mp4\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Z-API: POST /send-video {phone, video, caption}."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
+                      "pm.test(\"Custo 0.25 (mesmo preço do texto)\", () => pm.expect(pm.response.json().cost).to.eql(0.25));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Detalhes da mensagem com mídia",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/messages/{{mediaMessageId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages",
+                    "{{mediaMessageId}}"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                      "pm.test(\"Traz a mídia\", () => pm.expect(pm.response.json().media.type).to.eql(\"image\"));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Áudio com legenda (erro esperado 422)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/messages",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"conversationId\": \"{{conversationId}}\",\n  \"content\": \"ouça\",\n  \"priority\": \"normal\",\n  \"media\": {\n    \"type\": \"audio\",\n    \"url\": \"https://www.w3schools.com/html/horse.mp3\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Documento sem extensão (erro esperado 422)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/messages",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "messages"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"conversationId\": \"{{conversationId}}\",\n  \"priority\": \"normal\",\n  \"media\": {\n    \"type\": \"document\",\n    \"url\": \"https://exemplo.com/arquivo\"\n  }\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
           "name": "Processar fila (worker)",
           "item": [
             {
@@ -2042,6 +2606,57 @@
                     "exec": [
                       "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
                       "pm.collectionVariables.set(\"campaignId\", pm.response.json().id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Disparar campanha com imagem (encarte)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/campaigns",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "campaigns"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Encarte da semana (teste)\",\n  \"priority\": \"normal\",\n  \"recipientIds\": [\n    \"{{recipientId}}\"\n  ],\n  \"media\": {\n    \"type\": \"image\",\n    \"url\": \"https://www.z-api.io/wp-content/themes/z-api/dist/images/logo.svg\"\n  },\n  \"content\": \"Confira as ofertas!\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Status 201\", () => pm.response.to.have.status(201));"
                     ]
                   }
                 }
@@ -2917,6 +3532,718 @@
       ]
     },
     {
+      "name": "07 Funcionalidades adicionais",
+      "item": [
+        {
+          "name": "Operadores",
+          "item": [
+            {
+              "name": "Cadastrar operador",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/operators",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "operators"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Operador Teste\",\n  \"email\": \"operador{{$timestamp}}@teste.com\",\n  \"password\": \"senha12345\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Somente o administrador da empresa cadastra operadores."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                      "pm.collectionVariables.set(\"operatorId\", pm.response.json().id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Listar operadores",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/operators",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "operators"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Desativar operador",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/operators/{{operatorId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "operators",
+                    "{{operatorId}}"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Operador Teste\",\n  \"active\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Planos e assinatura (backoffice)",
+          "item": [
+            {
+              "name": "Criar plano",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/plans",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "plans"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Plano Teste {{$timestamp}}\",\n  \"monthlyFee\": 49.9,\n  \"includedOperators\": 3,\n  \"normalPrice\": 0.2,\n  \"urgentPrice\": 0.4\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                      "pm.collectionVariables.set(\"planId\", pm.response.json().id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Listar planos",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/plans",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "plans"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{adminToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Assinatura da empresa",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/clients/me/subscription",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "clients",
+                    "me",
+                    "subscription"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "description": "Sem plano, responde com os preços padrão."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Departamentos e URA",
+          "item": [
+            {
+              "name": "Criar departamento",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/departments",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "departments"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Vendas {{$timestamp}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                      "pm.collectionVariables.set(\"departmentId\", pm.response.json().id);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Listar departamentos",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/departments",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "departments"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Configurar URA",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/ivr",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "ivr"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"active\": false,\n  \"welcomeMessage\": \"Olá, {nome}! Bem-vindo ao Supermercado São Pedro.\",\n  \"questionMessage\": \"Com qual departamento deseja falar? Responda com o número:\",\n  \"maxAttempts\": 3,\n  \"defaultDepartmentId\": \"{{departmentId}}\",\n  \"ignoreGroups\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Deixe active=false para não mandar o menu ao número de teste."
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Consultar URA",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/ivr",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "ivr"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Atendimento em equipe",
+          "item": [
+            {
+              "name": "Participar do atendimento",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/conversations/{{conversationId}}/join",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "conversations",
+                    "{{conversationId}}",
+                    "join"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Nota interna",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/conversations/{{conversationId}}/notes",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "conversations",
+                    "{{conversationId}}",
+                    "notes"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"content\": \"Cliente pediu retorno à tarde (nota interna, não vai para o WhatsApp).\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));",
+                      "pm.test(\"Nota interna\", () => pm.expect(pm.response.json().internal).to.eql(true));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Transferir para o departamento",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/conversations/{{conversationId}}/transfer",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "conversations",
+                    "{{conversationId}}",
+                    "transfer"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"operatorId\": null,\n  \"departmentId\": \"{{departmentId}}\",\n  \"note\": \"Pode seguir com o pedido, por favor.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Deixar de participar",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/conversations/{{conversationId}}/leave",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "conversations",
+                    "{{conversationId}}",
+                    "leave"
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Painel do gestor",
+          "item": [
+            {
+              "name": "Dashboard do mês",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/reports/dashboard?from={{monthStart}}&to={{today}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "reports",
+                    "dashboard"
+                  ],
+                  "query": [
+                    {
+                      "key": "from",
+                      "value": "{{monthStart}}"
+                    },
+                    {
+                      "key": "to",
+                      "value": "{{today}}"
+                    }
+                  ]
+                },
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{clientToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test(\"Sucesso (2xx)\", () => pm.expect(pm.response.code).to.be.within(200, 299));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "99 Ações manuais (não rodar no Runner)",
       "item": [
         {
@@ -3078,6 +4405,46 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test(\"Status 422\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Código para conectar pelo telefone",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/whatsapp/phone-code/{{testPhone}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "whatsapp",
+                "phone-code",
+                "{{testPhone}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Z-API: GET /phone-code/{phone}. Alternativa ao QR Code: digite o código no WhatsApp em Aparelhos conectados > Conectar com número de telefone. Só funciona com o número desconectado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200, 422 (já conectado) ou 502 (Z-API)\", () => pm.expect([200, 422, 502]).to.include(pm.response.code));"
                 ]
               }
             }

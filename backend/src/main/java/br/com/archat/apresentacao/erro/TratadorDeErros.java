@@ -58,6 +58,16 @@ class TratadorDeErros {
         return resposta(HttpStatus.BAD_GATEWAY, e.getMessage(), null);
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    ResponseEntity<RespostaErro> arquivoGrande(Exception e) {
+        return resposta(HttpStatus.PAYLOAD_TOO_LARGE, "O arquivo deve ter no máximo 16 MB", null);
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+    ResponseEntity<RespostaErro> semArquivo(Exception e) {
+        return resposta(HttpStatus.BAD_REQUEST, "Envie o arquivo no campo 'file'", null);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<RespostaErro> camposInvalidos(MethodArgumentNotValidException e) {
         Map<String, String> campos = new LinkedHashMap<>();

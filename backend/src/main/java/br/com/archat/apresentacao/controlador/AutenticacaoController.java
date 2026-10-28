@@ -4,6 +4,7 @@ import br.com.archat.aplicacao.autenticacao.AutenticarAdministradorUseCase;
 import br.com.archat.aplicacao.autenticacao.AutenticarClienteUseCase;
 import br.com.archat.aplicacao.conta.CadastrarContaUseCase;
 import br.com.archat.aplicacao.conta.RecuperarSenhaUseCase;
+import br.com.archat.aplicacao.operador.GerenciarOperadoresUseCase;
 import br.com.archat.apresentacao.dto.ApiEnums;
 import br.com.archat.apresentacao.dto.AutenticacaoDtos.AdminAuthRequest;
 import br.com.archat.apresentacao.dto.AutenticacaoDtos.AdminAuthResponse;
@@ -31,10 +32,13 @@ class AutenticacaoController {
     private final AutenticarAdministradorUseCase autenticarAdministrador;
     private final CadastrarContaUseCase cadastrarConta;
     private final RecuperarSenhaUseCase recuperarSenha;
+    private final GerenciarOperadoresUseCase equipe;
 
     AutenticacaoController(AutenticarClienteUseCase autenticarCliente,
                            AutenticarAdministradorUseCase autenticarAdministrador,
-                           CadastrarContaUseCase cadastrarConta, RecuperarSenhaUseCase recuperarSenha) {
+                           CadastrarContaUseCase cadastrarConta, RecuperarSenhaUseCase recuperarSenha,
+                           GerenciarOperadoresUseCase equipe) {
+        this.equipe = equipe;
         this.autenticarCliente = autenticarCliente;
         this.autenticarAdministrador = autenticarAdministrador;
         this.cadastrarConta = cadastrarConta;
@@ -48,7 +52,7 @@ class AutenticacaoController {
         var autenticado = cadastrarConta.executar(new CadastrarContaUseCase.Comando(r.name(), r.email(), r.phone(),
                 r.documentId(), ApiEnums.documento(r.documentType()), r.password(), r.passwordConfirmation(),
                 r.acceptTerms()));
-        return new ClientAuthResponse(autenticado.token(), ClientResponse.de(autenticado.cliente()));
+        return doDono(autenticado.token(), autenticado.cliente());
     }
 
     @PostMapping("/auth/login")
@@ -56,10 +60,11 @@ class AutenticacaoController {
     ClientAuthResponse entrar(@Valid @RequestBody EmailLoginRequest r) {
         var autenticado = autenticarCliente.porEmail(r.email(), r.password());
         var operador = autenticado.operador();
-        return new ClientAuthResponse(autenticado.token(), ClientResponse.de(autenticado.cliente()),
-                operador == null ? "owner" : "operator",
-                operador == null ? autenticado.cliente().nome() : operador.nome(),
-                operador == null ? null : operador.id());
+        if (operador == null) {
+            return doDono(autenticado.token(), autenticado.cliente());
+        }
+        return new ClientAuthResponse(autenticado.token(), ClientResponse.de(autenticado.cliente()), "operator",
+                operador.nome(), operador.id());
     }
 
     @PostMapping("/auth/forgot-password")
@@ -81,7 +86,12 @@ class AutenticacaoController {
     @Operation(summary = "Autentica o cliente pelo CPF/CNPJ (acesso de demonstração e da collection do Postman)")
     ClientAuthResponse autenticarCliente(@Valid @RequestBody ClientAuthRequest requisicao) {
         var autenticado = autenticarCliente.executar(requisicao.documentId(), ApiEnums.documento(requisicao.documentType()));
-        return new ClientAuthResponse(autenticado.token(), ClientResponse.de(autenticado.cliente()));
+        return doDono(autenticado.token(), autenticado.cliente());
+    }
+
+    private ClientAuthResponse doDono(String token, br.com.archat.dominio.cliente.Cliente cliente) {
+        return new ClientAuthResponse(token, ClientResponse.de(cliente), "owner", cliente.nome(),
+                equipe.perfilDoDono(cliente.id(), cliente.nome()).id());
     }
 
     @PostMapping("/admin/auth")

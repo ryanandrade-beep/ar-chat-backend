@@ -68,7 +68,7 @@ public class RecuperarSenhaUseCase {
                 + ". Ele vale por 15 minutos. Se não foi você, ignore esta mensagem.";
         if (canal == Canal.WHATSAPP && whatsapp != null) {
             try {
-                whatsapp.enviarAvisoDoSistema(conta.telefone(), texto);
+                whatsapp.enviarAvisoDoSistema(null, conta.telefone(), texto);
                 return;
             } catch (RuntimeException e) {
             }

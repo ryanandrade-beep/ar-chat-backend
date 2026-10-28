@@ -1,14 +1,17 @@
 package br.com.archat.apresentacao.controlador;
 
+import br.com.archat.aplicacao.operador.GerenciarOperadoresUseCase;
+import br.com.archat.aplicacao.relatorio.PainelDoGestorUseCase;
 import br.com.archat.aplicacao.relatorio.Periodo;
-import br.com.archat.aplicacao.relatorio.RelatorioCampanhasUseCase;
 import br.com.archat.aplicacao.relatorio.RelatorioAtendimentosUseCase;
+import br.com.archat.aplicacao.relatorio.RelatorioCampanhasUseCase;
 import br.com.archat.aplicacao.relatorio.RelatorioFaturamentoUseCase;
 import br.com.archat.apresentacao.dto.Csv;
+import br.com.archat.apresentacao.dto.RelatorioDtos.AttendancesReport;
 import br.com.archat.apresentacao.dto.RelatorioDtos.CampaignsReport;
 import br.com.archat.apresentacao.dto.RelatorioDtos.RevenueReport;
-import br.com.archat.apresentacao.dto.RelatorioDtos.AttendancesReport;
 import br.com.archat.apresentacao.seguranca.AdministradorAutenticado;
+import br.com.archat.apresentacao.seguranca.ClienteAutenticado;
 import br.com.archat.apresentacao.seguranca.UsuarioAutenticado;
 import br.com.archat.dominio.excecao.RegraDeNegocioException;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,7 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -38,13 +43,51 @@ class RelatorioController {
     private final RelatorioFaturamentoUseCase faturamento;
     private final RelatorioCampanhasUseCase campanhas;
     private final ZoneId fuso;
+    private final PainelDoGestorUseCase painel;
+    private final GerenciarOperadoresUseCase operadores;
 
     RelatorioController(RelatorioAtendimentosUseCase atendimentos, RelatorioFaturamentoUseCase faturamento,
-                        RelatorioCampanhasUseCase campanhas, ZoneId fuso) {
+                        RelatorioCampanhasUseCase campanhas, ZoneId fuso, PainelDoGestorUseCase painel,
+                        GerenciarOperadoresUseCase operadores) {
+        this.painel = painel;
+        this.operadores = operadores;
         this.atendimentos = atendimentos;
         this.faturamento = faturamento;
         this.campanhas = campanhas;
         this.fuso = fuso;
+    }
+
+    @GetMapping("/dashboard")
+    @Operation(summary = "Dashboard do dono: atendimentos do período, abertos, finalizados, 1ª resposta, por dia, "
+            + "por operador e os 10 contatos que mais geram atendimento (filtro opcional operatorId)")
+    DashboardResponse painel(ClienteAutenticado cliente,
+                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                             @RequestParam(required = false) UUID operatorId) {
+        cliente.exigirGestor();
+        var p = painel.emitir(cliente.id(), periodo(from, to), operatorId);
+        Map<UUID, String> nomes = new HashMap<>();
+        operadores.listar(cliente.id()).forEach(o -> nomes.put(o.id(), o.nome()));
+        List<OperatorCount> porOperador = p.porOperador().entrySet().stream()
+                .map(e -> e.getKey().equals(PainelDoGestorUseCase.SEM_RESPONSAVEL)
+                        ? new OperatorCount(null, "Sem responsável", e.getValue())
+                        : new OperatorCount(e.getKey(), nomes.getOrDefault(e.getKey(), "?"), e.getValue()))
+                .sorted(java.util.Comparator.comparing(OperatorCount::attendances).reversed())
+                .toList();
+        return new DashboardResponse(from, to, p.atendimentos(), p.abertosAgora(), p.aguardandoAgora(), p.finalizados(),
+                p.mediaPrimeiraRespostaSegundos(), p.porDia(), porOperador,
+                p.topContatos().stream().map(c -> new TopContact(c.nome(), c.telefone(), c.atendimentos())).toList());
+    }
+
+    record OperatorCount(UUID operatorId, String name, long attendances) {
+    }
+
+    record TopContact(String name, String phone, long attendances) {
+    }
+
+    record DashboardResponse(LocalDate from, LocalDate to, long attendances, long openNow, long waitingNow, long finished,
+                             Long averageFirstResponseSeconds, Map<LocalDate, Long> perDay,
+                             List<OperatorCount> perOperator, List<TopContact> topContacts) {
     }
 
     @GetMapping("/attendances")

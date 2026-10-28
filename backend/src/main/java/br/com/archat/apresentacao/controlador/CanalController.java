@@ -1,7 +1,7 @@
 package br.com.archat.apresentacao.controlador;
 
 import br.com.archat.aplicacao.canal.ListarCanaisUseCase;
-import br.com.archat.apresentacao.seguranca.UsuarioAutenticado;
+import br.com.archat.apresentacao.seguranca.ClienteAutenticado;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,8 +23,8 @@ class CanalController {
 
     @GetMapping
     @Operation(summary = "Lista os canais e quais estão disponíveis e conectados")
-    List<ChannelResponse> listar(UsuarioAutenticado usuario) {
-        return canais.listar().stream()
+    List<ChannelResponse> listar(ClienteAutenticado cliente) {
+        return canais.listar(cliente.id()).stream()
                 .map(c -> new ChannelResponse(c.id(), c.nome(), c.descricao(), c.disponivel(), c.conectado(),
                         c.disponivel() ? null : "Em breve"))
                 .toList();

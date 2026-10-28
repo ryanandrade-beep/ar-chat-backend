@@ -14,4 +14,6 @@ public interface AtendimentoRepositorio {
     Optional<Atendimento> buscarAbertoDaConversa(UUID conversaId);
 
     List<Atendimento> listarFinalizados(UUID clienteId, Instant de, Instant ate);
+
+    List<Atendimento> listarAbertosNoPeriodo(UUID clienteId, Instant de, Instant ate);
 }

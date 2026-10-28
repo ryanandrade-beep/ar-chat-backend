@@ -50,7 +50,9 @@ public class RelatorioCampanhasUseCase {
         long enviadas = qtd(porStatus, StatusMensagem.ENVIADA) + entregues;
         long falhas = qtd(porStatus, StatusMensagem.FALHA);
         long pendentes = qtd(porStatus, StatusMensagem.ENFILEIRADA) + qtd(porStatus, StatusMensagem.PROCESSANDO);
-        BigDecimal estornado = campanha.prioridade().custo().multiply(BigDecimal.valueOf(falhas)).setScale(2);
+        BigDecimal precoUnitario = campanha.custoTotal().divide(BigDecimal.valueOf(campanha.totalDestinatarios()), 2,
+                RoundingMode.HALF_EVEN);
+        BigDecimal estornado = precoUnitario.multiply(BigDecimal.valueOf(falhas)).setScale(2);
         BigDecimal custoLiquido = campanha.custoTotal().subtract(estornado);
         BigDecimal custoPorEntregue = entregues == 0 ? null
                 : custoLiquido.divide(BigDecimal.valueOf(entregues), 2, RoundingMode.HALF_EVEN);

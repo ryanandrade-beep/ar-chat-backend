@@ -1,5 +1,6 @@
 package br.com.archat.aplicacao.operador;
 
+import br.com.archat.aplicacao.plano.PlanoDoCliente;
 import br.com.archat.aplicacao.porta.CodificadorSenha;
 import br.com.archat.aplicacao.porta.ContaDeAcessoRepositorio;
 import br.com.archat.aplicacao.porta.OperadorRepositorio;
@@ -26,14 +27,31 @@ public class GerenciarOperadoresUseCase {
     private final CodificadorSenha codificador;
     private final UnidadeDeTrabalho unidadeDeTrabalho;
     private final Clock relogio;
+    private final PlanoDoCliente planos;
 
     public GerenciarOperadoresUseCase(OperadorRepositorio operadores, ContaDeAcessoRepositorio contas,
                                       CodificadorSenha codificador, UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio) {
+        this(operadores, contas, codificador, unidadeDeTrabalho, relogio, null);
+    }
+
+    public GerenciarOperadoresUseCase(OperadorRepositorio operadores, ContaDeAcessoRepositorio contas,
+                                      CodificadorSenha codificador, UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
+                                      PlanoDoCliente planos) {
+        this.planos = planos;
         this.operadores = operadores;
         this.contas = contas;
         this.codificador = codificador;
         this.unidadeDeTrabalho = unidadeDeTrabalho;
         this.relogio = relogio;
+    }
+
+    public Operador perfilDoDono(UUID clienteId, String nomeDoDono) {
+        return operadores.listarPorCliente(clienteId).stream().filter(Operador::dono).findFirst()
+                .orElseGet(() -> unidadeDeTrabalho.executar(() -> {
+                    Operador perfil = Operador.perfilDoDono(clienteId, nomeDoDono, relogio.instant());
+                    operadores.salvar(perfil);
+                    return perfil;
+                }));
     }
 
     public List<Operador> listar(UUID clienteId) {
@@ -54,6 +72,7 @@ public class GerenciarOperadoresUseCase {
             if (operadores.existeComEmail(normalizado) || contas.existeComEmail(normalizado)) {
                 throw new RegraDeNegocioException("Este e-mail já é usado por outro login");
             }
+            garantirVaga(clienteId);
             operadores.salvar(novo);
             return novo;
         });
@@ -62,9 +81,26 @@ public class GerenciarOperadoresUseCase {
     public Operador alterar(UUID clienteId, UUID operadorId, String nome, boolean ativo) {
         return unidadeDeTrabalho.executar(() -> {
             Operador operador = buscar(clienteId, operadorId);
+            if (ativo && !operador.ativo()) {
+                garantirVaga(clienteId);
+            }
             operador.alterar(nome, ativo);
             operadores.salvar(operador);
             return operador;
+        });
+    }
+
+    public java.util.Optional<Integer> limite(UUID clienteId) {
+        return planos == null ? java.util.Optional.empty() : planos.limiteDeOperadores(clienteId);
+    }
+
+    private void garantirVaga(UUID clienteId) {
+        limite(clienteId).ifPresent(limite -> {
+            long ativos = operadores.listarPorCliente(clienteId).stream().filter(o -> o.ativo() && !o.dono()).count();
+            if (ativos >= limite) {
+                throw new RegraDeNegocioException("Seu plano inclui %d operador(es). Para contratar mais, mude de plano em Assinatura."
+                        .formatted(limite));
+            }
         });
     }
 

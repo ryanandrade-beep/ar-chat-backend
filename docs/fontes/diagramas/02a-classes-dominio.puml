@@ -31,6 +31,7 @@ class Campanha {
   - id : UUID
   - nome : String
   - conteudo : String
+  - midia : Midia
   - prioridade : Prioridade
   - totalDestinatarios : Integer
   - custoTotal : Decimal
@@ -42,6 +43,12 @@ class Conversa {
   - dataUltimaMensagem : DateTime
   - naoLidas : Integer
   - statusAtendimento : StatusAtendimento
+  - operadorId : UUID
+  - departamentoId : UUID
+  - aguardandoUra : Boolean
+  - tentativasUra : Integer
+  + atribuirA(operadorId : UUID) : void
+  + definirDepartamento(id : UUID) : void
   + registrar(m : Mensagem) : void
   + registrarRecebida(m : Mensagem) : void
   + marcarComoLida() : void
@@ -49,12 +56,18 @@ class Conversa {
 class Mensagem {
   - id : UUID
   - conteudo : String
+  - midia : Midia
   - prioridade : Prioridade
   - status : StatusMensagem
   - custo : Decimal
   - tentativas : Integer
   - idExterno : String
   - criadaEm : DateTime
+  - automatica : Boolean
+  - interna : Boolean
+  - operadorId : UUID
+  - contato : ContatoCompartilhado
+  + {static} notaInterna(...) : Mensagem
   + iniciarProcessamento(agora) : void
   + confirmarEnvio(idExterno, agora) : void
   + confirmarEntrega(agora) : void
@@ -76,6 +89,26 @@ class Atendimento {
   + retomar() : void
   + finalizar(agora) : void
 }
+class Midia <<valor>> {
+  - tipo : TipoMidia
+  - url : String
+  - nomeArquivo : String
+  + extensao() : String
+}
+class ContatoCompartilhado <<valor>> {
+  - nome : String
+  - telefone : String
+}
+class Operador {
+  - id : UUID
+  - nome : String
+  - email : String
+  - senhaHash : String
+  - ativo : Boolean
+  - dono : Boolean
+  + alterar(nome, ativo) : void
+  + trocarSenha(hash) : void
+}
 class Transacao {
   - id : UUID
   - tipo : TipoTransacao
@@ -87,6 +120,8 @@ class Administrador {
   - id : UUID
   - nome : String
   - login : String
+  - email : String
+  - telefone : String
   - senhaHash : String
 }
 
@@ -100,4 +135,10 @@ Campanha "0..1" -- "1..*" Mensagem : gera >
 Cliente "1" -- "0..*" Transacao
 Mensagem "1" -- "0..*" Transacao : gera >
 Administrador ..> Cliente : gerencia
+Mensagem "0..*" --> "0..1" Midia
+Campanha "0..*" --> "0..1" Midia
+Mensagem "0..*" --> "0..1" ContatoCompartilhado
+Cliente "1" -- "1..*" Operador : equipe >
+Operador "0..1" -- "0..*" Conversa : responsável >
+Operador "0..*" -- "0..*" Conversa : participa >
 @enduml

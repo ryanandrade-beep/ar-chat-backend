@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -21,21 +22,23 @@ class ConexaoWhatsAppZApi implements ConexaoWhatsApp {
     private static final Pattern ERRO_ZAPI = Pattern.compile("\"(?:error|message)\"\\s*:\\s*\"([^\"]+)\"");
 
     private final ClienteZApi zapi;
+    private final InstanciasZApi instancias;
 
-    ConexaoWhatsAppZApi(ClienteZApi zapi) {
+    ConexaoWhatsAppZApi(ClienteZApi zapi, InstanciasZApi instancias) {
         this.zapi = zapi;
+        this.instancias = instancias;
     }
 
     @Override
-    public SituacaoConexao situacao() {
-        ClienteZApi.RespostaStatus status = chamar(zapi::status);
+    public SituacaoConexao situacao(UUID clienteId) {
+        ClienteZApi.RespostaStatus status = chamar(() -> zapi.status(instancias.da(clienteId)));
         return new SituacaoConexao("zapi", Boolean.TRUE.equals(status.connected()),
                 Boolean.TRUE.equals(status.smartphoneConnected()), status.error());
     }
 
     @Override
-    public String qrCode() {
-        Map<String, Object> resposta = chamar(zapi::qrCodeImagem);
+    public String qrCode(UUID clienteId) {
+        Map<String, Object> resposta = chamar(() -> zapi.qrCodeImagem(instancias.da(clienteId)));
         Object imagem = resposta == null ? null : resposta.get("value");
         if (imagem == null) {
             throw new RegraDeNegocioException("A Z-API não devolveu o QR Code (o aparelho pode exigir passkey); "
@@ -46,8 +49,9 @@ class ConexaoWhatsAppZApi implements ConexaoWhatsApp {
     }
 
     @Override
-    public String codigoPorTelefone(String telefone) {
-        Map<String, Object> resposta = chamar(() -> zapi.codigoPorTelefone(EnvioMensagemZApi.comDdi(telefone)));
+    public String codigoPorTelefone(UUID clienteId, String telefone) {
+        Map<String, Object> resposta = chamar(() -> zapi.codigoPorTelefone(instancias.da(clienteId),
+                EnvioMensagemZApi.comDdi(telefone)));
         Object codigo = resposta == null ? null : resposta.get("value");
         if (codigo == null) {
             throw new RegraDeNegocioException("A Z-API não devolveu o código (o aparelho pode exigir passkey); "
@@ -57,29 +61,29 @@ class ConexaoWhatsAppZApi implements ConexaoWhatsApp {
     }
 
     @Override
-    public void marcarComoLida(String telefoneOuGrupo, String idExterno) {
+    public void marcarComoLida(UUID clienteId, String telefoneOuGrupo, String idExterno) {
         chamar(() -> {
-            zapi.lerMensagem(EnvioMensagemZApi.comDdi(telefoneOuGrupo), idExterno);
+            zapi.lerMensagem(instancias.da(clienteId), EnvioMensagemZApi.comDdi(telefoneOuGrupo), idExterno);
             return null;
         });
     }
 
     @Override
-    public void enviarAvisoDoSistema(String telefone, String texto) {
-        chamar(() -> zapi.enviarTexto(EnvioMensagemZApi.comDdi(telefone), texto));
+    public void enviarAvisoDoSistema(UUID clienteId, String telefone, String texto) {
+        chamar(() -> zapi.enviarTexto(instancias.da(clienteId), EnvioMensagemZApi.comDdi(telefone), texto));
     }
 
     @Override
-    public void desconectar() {
+    public void desconectar(UUID clienteId) {
         chamar(() -> {
-            zapi.desconectar();
+            zapi.desconectar(instancias.da(clienteId));
             return null;
         });
     }
 
     @Override
-    public List<ContatoWhatsApp> listarContatos(int pagina, int tamanhoPagina) {
-        return chamar(() -> zapi.contatos(pagina, tamanhoPagina)).stream()
+    public List<ContatoWhatsApp> listarContatos(UUID clienteId, int pagina, int tamanhoPagina) {
+        return chamar(() -> zapi.contatos(instancias.da(clienteId), pagina, tamanhoPagina)).stream()
                 .filter(c -> c.phone() != null && c.phone().matches("\\d{10,15}"))
                 .map(c -> new ContatoWhatsApp(c.phone(), primeiroPreenchido(c.name(), c.curto(), c.vname(), c.apelido(), c.phone())))
                 .toList();
@@ -95,8 +99,8 @@ class ConexaoWhatsAppZApi implements ConexaoWhatsApp {
     }
 
     @Override
-    public List<GrupoWhatsApp> listarGrupos(int pagina, int tamanhoPagina) {
-        return chamar(() -> zapi.grupos(pagina, tamanhoPagina)).stream()
+    public List<GrupoWhatsApp> listarGrupos(UUID clienteId, int pagina, int tamanhoPagina) {
+        return chamar(() -> zapi.grupos(instancias.da(clienteId), pagina, tamanhoPagina)).stream()
                 .filter(g -> !Boolean.FALSE.equals(g.isGroup()))
                 .map(g -> new GrupoWhatsApp(g.phone(), g.name()))
                 .toList();

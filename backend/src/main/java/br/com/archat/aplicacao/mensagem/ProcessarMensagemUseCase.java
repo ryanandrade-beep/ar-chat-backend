@@ -83,16 +83,17 @@ public class ProcessarMensagemUseCase {
 
     private EnvioMensagemGateway.ResultadoEnvio tentarEnviar(Mensagem mensagem) {
         try {
-            return envio.enviar(new EnvioMensagemGateway.Envio(mensagem.id(), telefoneDoDestinatario(mensagem),
-                    mensagem.conteudo(), mensagem.midia(), mensagem.prioridade(), mensagem.tentativas()));
+            Conversa conversa = conversas.buscarPorId(mensagem.conversaId())
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Conversa"));
+            return envio.enviar(new EnvioMensagemGateway.Envio(mensagem.id(), conversa.clienteId(),
+                    telefoneDoDestinatario(conversa), mensagem.conteudo(), mensagem.midia(), mensagem.prioridade(),
+                    mensagem.tentativas(), mensagem.contato()));
         } catch (RuntimeException erro) {
             return EnvioMensagemGateway.ResultadoEnvio.recusado();
         }
     }
 
-    private String telefoneDoDestinatario(Mensagem mensagem) {
-        Conversa conversa = conversas.buscarPorId(mensagem.conversaId())
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Conversa"));
+    private String telefoneDoDestinatario(Conversa conversa) {
         return destinatarios.buscarPorId(conversa.destinatarioId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Destinatário"))
                 .telefone();

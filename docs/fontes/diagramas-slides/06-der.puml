@@ -3,6 +3,18 @@
 !include skin.iuml
 hide circle
 skinparam linetype ortho
+entity conta_acesso {
+  * cliente_id : uuid <<PK, FK>>
+  --
+  * email : varchar(160) <<UK>>
+  * telefone : varchar(13)
+  * senha_hash : varchar(100)
+  * versao_termos : varchar(20)
+  * termos_aceitos_em : timestamptz
+  codigo_hash : varchar(100)
+  codigo_expira_em : timestamptz
+  * tentativas_codigo : integer
+}
 entity cliente {
   * id : uuid <<PK>>
   --
@@ -31,6 +43,9 @@ entity campanha {
   * cliente_id : uuid <<FK>>
   * nome : varchar(120)
   * conteudo : text
+  tipo_midia : varchar(10)
+  url_midia : varchar(2048)
+  nome_arquivo : varchar(255)
   * prioridade : varchar(10)
   * total_destinatarios : integer
   * custo_total : numeric(12,2)
@@ -53,6 +68,9 @@ entity mensagem {
   campanha_id : uuid <<FK>>
   * remetente_tipo : varchar(12)
   * conteudo : text
+  tipo_midia : varchar(10)
+  url_midia : varchar(2048)
+  nome_arquivo : varchar(255)
   * prioridade : varchar(10)
   * status : varchar(12)
   * custo : numeric(5,2)
@@ -91,6 +109,7 @@ entity administrador {
   * login : varchar(50) <<UK>>
   * senha_hash : varchar(255)
 }
+cliente ||--o| conta_acesso
 cliente ||--o{ conversa
 cliente ||--o{ destinatario
 destinatario ||--o| conversa

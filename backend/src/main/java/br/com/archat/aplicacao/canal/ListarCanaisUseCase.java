@@ -19,10 +19,10 @@ public class ListarCanaisUseCase {
         this.conexao = conexao;
     }
 
-    public List<Canal> listar() {
+    public List<Canal> listar(java.util.UUID clienteId) {
         boolean conectado;
         try {
-            conectado = conexao.situacao().conectado();
+            conectado = conexao.situacao(clienteId).conectado();
         } catch (RuntimeException e) {
             conectado = false;
         }

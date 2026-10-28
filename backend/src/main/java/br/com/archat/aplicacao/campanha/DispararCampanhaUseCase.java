@@ -1,5 +1,6 @@
 package br.com.archat.aplicacao.campanha;
 
+import br.com.archat.aplicacao.plano.PlanoDoCliente;
 import br.com.archat.aplicacao.porta.CampanhaRepositorio;
 import br.com.archat.aplicacao.porta.ClienteRepositorio;
 import br.com.archat.aplicacao.porta.ConversaRepositorio;
@@ -21,6 +22,7 @@ import br.com.archat.dominio.mensagem.Midia;
 import br.com.archat.dominio.mensagem.Prioridade;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -44,11 +46,21 @@ public class DispararCampanhaUseCase {
     private final FilaMensagens fila;
     private final UnidadeDeTrabalho unidadeDeTrabalho;
     private final Clock relogio;
+    private final PlanoDoCliente planos;
 
     public DispararCampanhaUseCase(ClienteRepositorio clientes, DestinatarioRepositorio destinatarios,
                                    ConversaRepositorio conversas, MensagemRepositorio mensagens,
                                    TransacaoRepositorio transacoes, CampanhaRepositorio campanhas,
                                    FilaMensagens fila, UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio) {
+        this(clientes, destinatarios, conversas, mensagens, transacoes, campanhas, fila, unidadeDeTrabalho, relogio, null);
+    }
+
+    public DispararCampanhaUseCase(ClienteRepositorio clientes, DestinatarioRepositorio destinatarios,
+                                   ConversaRepositorio conversas, MensagemRepositorio mensagens,
+                                   TransacaoRepositorio transacoes, CampanhaRepositorio campanhas,
+                                   FilaMensagens fila, UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
+                                   PlanoDoCliente planos) {
+        this.planos = planos;
         this.clientes = clientes;
         this.destinatarios = destinatarios;
         this.conversas = conversas;
@@ -66,8 +78,10 @@ public class DispararCampanhaUseCase {
             Cliente cliente = clientes.buscarPorIdParaAtualizacao(comando.clienteId())
                     .orElseThrow(() -> new RecursoNaoEncontradoException("Cliente"));
             List<Destinatario> publico = publicoDaCampanha(comando);
+            BigDecimal preco = comando.prioridade() == null ? null
+                    : planos == null ? comando.prioridade().custo() : planos.custo(cliente.id(), comando.prioridade());
             Campanha campanha = Campanha.nova(cliente.id(), comando.nome(), comando.conteudo(), comando.midia(),
-                    comando.prioridade(),
+                    comando.prioridade(), preco,
                     publico.size(), agora);
             garantirSaldoParaTudo(cliente, campanha);
 
@@ -113,8 +127,10 @@ public class DispararCampanhaUseCase {
     private Mensagem registrarMensagem(Cliente cliente, Campanha campanha, Destinatario destinatario, Instant agora) {
         Conversa conversa = conversas.buscarPorDestinatario(destinatario.id())
                 .orElseGet(() -> Conversa.iniciar(cliente.id(), destinatario.id()));
+        BigDecimal preco = campanha.custoTotal().divide(BigDecimal.valueOf(campanha.totalDestinatarios()), 2,
+                RoundingMode.HALF_EVEN);
         Mensagem mensagem = Mensagem.novaDoCliente(conversa.id(), campanha.id(), campanha.conteudo(),
-                campanha.midia(), campanha.prioridade(), agora);
+                campanha.midia(), campanha.prioridade(), preco, agora);
         cliente.cobrar(mensagem.custo());
         conversa.registrar(mensagem);
         conversas.salvar(conversa);

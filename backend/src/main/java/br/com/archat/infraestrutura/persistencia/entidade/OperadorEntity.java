@@ -24,6 +24,8 @@ public class OperadorEntity {
     @Column(name = "criado_em")
     private Instant criadoEm;
 
+    private boolean dono;
+
     protected OperadorEntity() {
     }
 
@@ -45,4 +47,9 @@ public class OperadorEntity {
     public String getSenhaHash() { return senhaHash; }
     public boolean isAtivo() { return ativo; }
     public Instant getCriadoEm() { return criadoEm; }
+    public boolean isDono() { return dono; }
+
+    public void definirDono(boolean dono) {
+        this.dono = dono;
+    }
 }

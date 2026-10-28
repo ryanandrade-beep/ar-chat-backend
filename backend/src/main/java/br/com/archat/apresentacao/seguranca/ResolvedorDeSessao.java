@@ -3,6 +3,8 @@ package br.com.archat.apresentacao.seguranca;
 import br.com.archat.aplicacao.autenticacao.Sessao;
 import br.com.archat.aplicacao.excecao.AcessoNegadoException;
 import br.com.archat.aplicacao.excecao.NaoAutenticadoException;
+import br.com.archat.aplicacao.operador.GerenciarOperadoresUseCase;
+import br.com.archat.aplicacao.porta.ClienteRepositorio;
 import br.com.archat.aplicacao.porta.OperadorRepositorio;
 import br.com.archat.aplicacao.porta.ServicoToken;
 import br.com.archat.dominio.cliente.Operador;
@@ -15,6 +17,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Lê o token do cabeçalho {@code Authorization: Bearer} e entrega ao controller quem está autenticado.
@@ -30,10 +33,15 @@ public class ResolvedorDeSessao implements HandlerMethodArgumentResolver {
 
     private final ServicoToken tokens;
     private final OperadorRepositorio operadores;
+    private final GerenciarOperadoresUseCase equipe;
+    private final ClienteRepositorio clientes;
 
-    public ResolvedorDeSessao(ServicoToken tokens, OperadorRepositorio operadores) {
+    public ResolvedorDeSessao(ServicoToken tokens, OperadorRepositorio operadores, GerenciarOperadoresUseCase equipe,
+                              ClienteRepositorio clientes) {
         this.tokens = tokens;
         this.operadores = operadores;
+        this.equipe = equipe;
+        this.clientes = clientes;
     }
 
     @Override
@@ -60,7 +68,9 @@ public class ResolvedorDeSessao implements HandlerMethodArgumentResolver {
                 return new ClienteAutenticado(operador.clienteId(), operador.id());
             }
             exigirPerfil(sessao, Sessao.Perfil.CLIENTE, "Rota disponível apenas para clientes");
-            return new ClienteAutenticado(sessao.id());
+            UUID clienteId = sessao.id();
+            return new ClienteAutenticado(clienteId, null, () -> equipe.perfilDoDono(clienteId,
+                    clientes.buscarPorId(clienteId).map(c -> c.nome()).orElse("Responsável")).id());
         }
         exigirPerfil(sessao, Sessao.Perfil.ADMINISTRADOR, "Rota disponível apenas para administradores");
         return new AdministradorAutenticado(sessao.id());

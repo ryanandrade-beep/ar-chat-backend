@@ -26,6 +26,10 @@ public record Transacao(UUID id, UUID clienteId, UUID mensagemId, TipoTransacao 
         return nova(cliente, null, TipoTransacao.CREDITO, valor, agora);
     }
 
+    public static Transacao mensalidade(Cliente cliente, BigDecimal valor, Instant agora) {
+        return nova(cliente, null, TipoTransacao.MENSALIDADE, valor, agora);
+    }
+
     public static Transacao ajusteDeLimite(Cliente cliente, Instant agora) {
         return nova(cliente, null, TipoTransacao.AJUSTE_LIMITE, cliente.limiteMensal(), agora);
     }

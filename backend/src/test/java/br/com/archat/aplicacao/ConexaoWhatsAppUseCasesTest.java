@@ -29,10 +29,10 @@ class ConexaoWhatsAppUseCasesTest {
     void codigoPorTelefoneSoComNumeroValidoEWhatsAppDesconectado() {
         GerenciarConexaoWhatsAppUseCase conexao = new GerenciarConexaoWhatsAppUseCase(canal);
 
-        assertThat(conexao.codigoPorTelefone("+55 (44) 99729-4996")).isEqualTo("CODIGO-5544997294996");
-        assertThatThrownBy(() -> conexao.codigoPorTelefone("123")).isInstanceOf(RegraDeNegocioException.class);
+        assertThat(conexao.codigoPorTelefone(null, "+55 (44) 99729-4996")).isEqualTo("CODIGO-5544997294996");
+        assertThatThrownBy(() -> conexao.codigoPorTelefone(null, "123")).isInstanceOf(RegraDeNegocioException.class);
         canal.conectado = true;
-        assertThatThrownBy(() -> conexao.codigoPorTelefone("5544997294996")).isInstanceOf(RegraDeNegocioException.class);
+        assertThatThrownBy(() -> conexao.codigoPorTelefone(null, "5544997294996")).isInstanceOf(RegraDeNegocioException.class);
     }
 
     @Test
@@ -51,7 +51,7 @@ class ConexaoWhatsAppUseCasesTest {
         Conversa conversa = conversas.buscarPorDestinatario(maria.id()).orElseThrow();
 
         new GerenciarAtendimentoUseCase(conversas, atendimentos, Fakes.SEM_TRANSACAO, relogio, mensagens, destinatarios,
-                canal, null).marcarComoLida(mercado, conversa.id());
+                canal, null, null).marcarComoLida(mercado, conversa.id());
 
         assertThat(canal.lidas).containsExactly("5544999990000:Z2");
         assertThat(conversas.buscarPorId(conversa.id()).orElseThrow().naoLidas()).isZero();
@@ -72,7 +72,7 @@ class ConexaoWhatsAppUseCasesTest {
         canal.falhar = true;
 
         Conversa lida = new GerenciarAtendimentoUseCase(conversas, atendimentos, Fakes.SEM_TRANSACAO, relogio, mensagens,
-                destinatarios, canal, null).marcarComoLida(mercado, conversa.id());
+                destinatarios, canal, null, null).marcarComoLida(mercado, conversa.id());
 
         assertThat(lida.naoLidas()).isZero();
     }
@@ -80,7 +80,7 @@ class ConexaoWhatsAppUseCasesTest {
     @Test
     void canalForaDoArApareceDesconectadoSemQuebrarALista() {
         canal.situacaoFalha = true;
-        var canais = new br.com.archat.aplicacao.canal.ListarCanaisUseCase(canal).listar();
+        var canais = new br.com.archat.aplicacao.canal.ListarCanaisUseCase(canal).listar(null);
         assertThat(canais).first().satisfies(c -> assertThat(c.conectado()).isFalse());
     }
 
@@ -108,13 +108,13 @@ class ConexaoWhatsAppUseCasesTest {
         boolean situacaoFalha;
         final List<String> lidas = new ArrayList<>();
 
-        public SituacaoConexao situacao() {
+        public SituacaoConexao situacao(UUID clienteId) {
             if (situacaoFalha) throw new IllegalStateException("canal fora do ar");
             return new SituacaoConexao("falso", conectado, conectado, null);
         }
-        public String qrCode() { return "data:image/png;base64,AAA"; }
-        public String codigoPorTelefone(String telefone) { return "CODIGO-" + telefone; }
-        public void marcarComoLida(String telefoneOuGrupo, String idExterno) {
+        public String qrCode(UUID clienteId) { return "data:image/png;base64,AAA"; }
+        public String codigoPorTelefone(UUID clienteId, String telefone) { return "CODIGO-" + telefone; }
+        public void marcarComoLida(UUID clienteId, String telefoneOuGrupo, String idExterno) {
             if (falhar) {
                 throw new IllegalStateException("canal fora do ar");
             }
@@ -122,14 +122,14 @@ class ConexaoWhatsAppUseCasesTest {
         }
         final List<String> avisos = new ArrayList<>();
         List<ContatoWhatsApp> agenda = List.of();
-        public void enviarAvisoDoSistema(String telefone, String texto) {
+        public void enviarAvisoDoSistema(UUID clienteId, String telefone, String texto) {
             if (falhar) {
                 throw new IllegalStateException("canal fora do ar");
             }
             avisos.add(telefone + ":" + texto);
         }
-        public List<ContatoWhatsApp> listarContatos(int pagina, int tamanhoPagina) { return agenda; }
-        public void desconectar() { }
-        public List<GrupoWhatsApp> listarGrupos(int pagina, int tamanhoPagina) { return List.of(); }
+        public List<ContatoWhatsApp> listarContatos(UUID clienteId, int pagina, int tamanhoPagina) { return agenda; }
+        public void desconectar(UUID clienteId) { }
+        public List<GrupoWhatsApp> listarGrupos(UUID clienteId, int pagina, int tamanhoPagina) { return List.of(); }
     }
 }
