@@ -58,9 +58,31 @@ class AtendimentoTest {
     void finalizadoNaoAceitaMaisMudancas() {
         Atendimento a = doClienteFinal();
         a.finalizar(t0.plusSeconds(600));
-        assertThat(a.duracao()).contains(Duration.ofMinutes(10));
+        assertThat(a.tempoDeAtendimento()).isEmpty();
         assertThatThrownBy(a::colocarEmEspera).isInstanceOf(RegraDeNegocioException.class);
         assertThatThrownBy(() -> a.registrarEnvio(t0)).isInstanceOf(RegraDeNegocioException.class);
+    }
+
+    @Test
+    void esperaEAtendimentoSaoMedidosSeparados() {
+        Atendimento a = doClienteFinal();
+        assertThat(a.tempoDeEspera()).isEmpty();
+
+        a.iniciar(t0.plusSeconds(120));
+        a.iniciar(t0.plusSeconds(300));
+        a.registrarEnvio(t0.plusSeconds(400));
+        a.finalizar(t0.plusSeconds(720));
+
+        assertThat(a.tempoDeEspera()).contains(Duration.ofMinutes(2));
+        assertThat(a.tempoAtePrimeiraResposta()).contains(Duration.ofSeconds(400));
+        assertThat(a.tempoDeAtendimento()).contains(Duration.ofMinutes(10));
+    }
+
+    @Test
+    void primeiraRespostaIniciaOAtendimentoSeNinguemPuxou() {
+        Atendimento a = doClienteFinal();
+        a.registrarEnvio(t0.plusSeconds(90));
+        assertThat(a.tempoDeEspera()).contains(Duration.ofSeconds(90));
     }
 
     @Test

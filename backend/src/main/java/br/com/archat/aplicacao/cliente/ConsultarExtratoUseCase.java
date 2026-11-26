@@ -1,6 +1,7 @@
 package br.com.archat.aplicacao.cliente;
 
 import br.com.archat.aplicacao.porta.TransacaoRepositorio;
+import br.com.archat.dominio.financeiro.TipoTransacao;
 import br.com.archat.dominio.financeiro.Transacao;
 
 import java.time.Clock;
@@ -12,7 +13,6 @@ import java.util.UUID;
 
 /** Extrato do cliente (créditos, débitos, estornos e ajustes) dos últimos 90 dias, do mais recente ao mais antigo. */
 public class ConsultarExtratoUseCase {
-
     private static final Duration PERIODO = Duration.ofDays(90);
 
     private final TransacaoRepositorio transacoes;
@@ -21,6 +21,14 @@ public class ConsultarExtratoUseCase {
     public ConsultarExtratoUseCase(TransacaoRepositorio transacoes, Clock relogio) {
         this.transacoes = transacoes;
         this.relogio = relogio;
+    }
+
+    public List<Transacao> pagamentos(UUID clienteId, Instant de, Instant ate, TipoTransacao tipo) {
+        return transacoes.listar(clienteId, de, ate).stream()
+                .filter(t -> t.tipo() == TipoTransacao.CREDITO || t.tipo() == TipoTransacao.MENSALIDADE)
+                .filter(t -> tipo == null || t.tipo() == tipo)
+                .sorted(Comparator.comparing(Transacao::dataHora).reversed())
+                .toList();
     }
 
     public List<Transacao> ultimas(UUID clienteId, int limite) {

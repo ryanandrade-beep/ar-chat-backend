@@ -8,3 +8,4 @@ docs/fontes/node_modules/
 docs/fontes/ferramentas/
 *.zip
 backend/.idea/
+.logs/

@@ -27,8 +27,14 @@ public class GerenciarDepartamentosUseCase {
     }
 
     public List<Departamento> listar(UUID clienteId) {
+        garantirGeral(clienteId);
         return departamentos.listarPorCliente(clienteId).stream()
-                .sorted(Comparator.comparing(Departamento::nome, String.CASE_INSENSITIVE_ORDER)).toList();
+                .sorted(Comparator.comparing(Departamento::geral).reversed()
+                        .thenComparing(Departamento::nome, String.CASE_INSENSITIVE_ORDER)).toList();
+    }
+
+    public Departamento garantirGeral(UUID clienteId) {
+        return unidadeDeTrabalho.executar(() -> departamentos.garantirGeral(clienteId));
     }
 
     public Departamento buscar(UUID clienteId, UUID departamentoId) {
@@ -37,6 +43,7 @@ public class GerenciarDepartamentosUseCase {
     }
 
     public Departamento criar(UUID clienteId, String nome) {
+        garantirGeral(clienteId);
         Departamento novo = Departamento.novo(clienteId, nome, relogio.instant());
         return unidadeDeTrabalho.executar(() -> {
             if (departamentos.existeComNome(clienteId, novo.nome(), null)) {
@@ -69,7 +76,7 @@ public class GerenciarDepartamentosUseCase {
             if (departamentoPadraoId != null) {
                 buscar(clienteId, departamentoPadraoId);
             }
-            if (ativa && listar(clienteId).stream().noneMatch(Departamento::ativo)) {
+            if (ativa && listar(clienteId).stream().noneMatch(d -> d.ativo() && !d.geral())) {
                 throw new RegraDeNegocioException("Cadastre ao menos um departamento ativo antes de ligar a URA");
             }
             ConfiguracaoUra configuracao = configuracao(clienteId);

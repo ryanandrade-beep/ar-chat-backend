@@ -5,6 +5,8 @@ import br.com.archat.aplicacao.atendimento.GerenciarAtendimentoUseCase;
 import br.com.archat.aplicacao.atendimento.ReceberMensagemUseCase;
 import br.com.archat.aplicacao.conversa.ConsultarConversasUseCase;
 import br.com.archat.aplicacao.departamento.GerenciarDepartamentosUseCase;
+import br.com.archat.aplicacao.entrega.GerenciarEntregasUseCase;
+import br.com.archat.dominio.entrega.ItemDeEntrega;
 import br.com.archat.aplicacao.mensagem.ConsultarMensagensUseCase;
 import br.com.archat.aplicacao.operador.GerenciarOperadoresUseCase;
 import br.com.archat.aplicacao.porta.FiltroMensagens;
@@ -13,7 +15,9 @@ import br.com.archat.apresentacao.dto.ConversaDtos.ConversationResponse;
 import br.com.archat.apresentacao.dto.ConversaDtos.Participant;
 import br.com.archat.apresentacao.dto.MensagemDtos.MessageResponse;
 import br.com.archat.apresentacao.dto.MensagemDtos.SimulatedReplyRequest;
+import br.com.archat.apresentacao.seguranca.AuditoriaDaRequisicao;
 import br.com.archat.apresentacao.seguranca.ClienteAutenticado;
+import br.com.archat.aplicacao.auditoria.RegistrarAuditoriaUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,10 +52,15 @@ class ConversaController {
     private final GerenciarDepartamentosUseCase departamentos;
 
     private final AtendimentoEmEquipeUseCase equipe;
+    private final GerenciarEntregasUseCase entregas;
+    private final RegistrarAuditoriaUseCase auditoria;
 
     ConversaController(ConsultarConversasUseCase conversas, ConsultarMensagensUseCase mensagens,
                        GerenciarAtendimentoUseCase atendimento, ReceberMensagemUseCase receber,
-                       GerenciarOperadoresUseCase operadores, GerenciarDepartamentosUseCase departamentos, AtendimentoEmEquipeUseCase equipe) {
+                       GerenciarOperadoresUseCase operadores, GerenciarDepartamentosUseCase departamentos, AtendimentoEmEquipeUseCase equipe,
+                       GerenciarEntregasUseCase entregas, RegistrarAuditoriaUseCase auditoria) {
+        this.entregas = entregas;
+        this.auditoria = auditoria;
         this.equipe = equipe;
         this.operadores = operadores;
         this.departamentos = departamentos;
@@ -75,7 +85,8 @@ class ConversaController {
                                 || equipe.participantes(r.conversa().id()).contains(cliente.atendenteId())
                         : responsavelConfere(r.conversa().operadorId(), assigned, cliente))
                 .filter(r -> department == null || department.equals(r.conversa().departamentoId()))
-                .map(r -> ConversationResponse.de(r, nomes, setores, participantesDe(r.conversa().id(), nomes))).toList();
+                .map(r -> ConversationResponse.de(r, nomes, setores, participantesDe(r.conversa().id(), nomes),
+                        cicloDe(r.conversa().id()))).toList();
     }
 
     @PutMapping("/{id}/department")
@@ -159,7 +170,11 @@ class ConversaController {
     private ConversationResponse resposta(ClienteAutenticado cliente, UUID conversaId) {
         Map<UUID, String> nomes = nomesDosOperadores(cliente);
         return ConversationResponse.de(conversas.buscar(cliente.id(), conversaId), nomes, nomesDosDepartamentos(cliente),
-                participantesDe(conversaId, nomes));
+                participantesDe(conversaId, nomes), cicloDe(conversaId));
+    }
+
+    private br.com.archat.apresentacao.dto.ConversaDtos.Attendance cicloDe(UUID conversaId) {
+        return br.com.archat.apresentacao.dto.ConversaDtos.Attendance.de(atendimento.cicloAtual(conversaId).orElse(null));
     }
 
     @GetMapping("/summary")
@@ -185,10 +200,52 @@ class ConversaController {
     }
 
     @PostMapping("/{id}/finish")
-    @Operation(summary = "Finaliza o atendimento; uma nova mensagem do cliente final abre outro")
-    ConversationResponse finalizar(ClienteAutenticado cliente, @PathVariable UUID id) {
-        atendimento.finalizar(cliente.id(), id);
+    @Operation(summary = "Finaliza o atendimento (destination=close, padrão) ou devolve a conversa para a fila geral, sem "
+            + "departamento nem responsável (destination=general). note é uma observação opcional (até 500 caracteres) "
+            + "que fica no histórico. Uma nova mensagem do cliente final depois de finalizar abre outro atendimento")
+    ConversationResponse finalizar(ClienteAutenticado cliente, @PathVariable UUID id,
+                                   @RequestBody(required = false) FinishRequest r) {
+        String observacao = r == null ? null : r.note();
+        var entrega = r == null ? null : r.delivery();
+        List<ItemDeEntrega> itens = List.of();
+        if (entrega != null) {
+            if (r.destination() != null && !"close".equals(r.destination())) {
+                throw new br.com.archat.dominio.excecao.RegraDeNegocioException("A entrega só pode ser gerada ao encerrar o atendimento");
+            }
+            itens = entrega.itens();
+            GerenciarEntregasUseCase.validar(entrega.address(), entrega.order(), itens, entrega.value(), entrega.paymentMethod(),
+                    entrega.note());
+        }
+        if (r != null && "general".equals(r.destination())) {
+            atendimento.enviarParaGeral(cliente.id(), id, observacao, cliente.atendenteId());
+            AuditoriaDaRequisicao.acao(br.com.archat.dominio.auditoria.AcaoDeAuditoria.ATENDIMENTO_ENVIADO_GERAL);
+        } else if (r != null && r.destination() != null && !"close".equals(r.destination())) {
+            throw new br.com.archat.dominio.excecao.RegraDeNegocioException("destination deve ser close ou general");
+        } else {
+            atendimento.finalizar(cliente.id(), id, observacao, cliente.atendenteId());
+            if (entrega != null) {
+                var criada = entregas.registrar(cliente.id(), new GerenciarEntregasUseCase.NovaEntrega(id, cliente.atendenteId(),
+                        entrega.address(), entrega.order(), itens, entrega.value(), entrega.paymentMethod(), entrega.note()));
+                auditoria.registrar(cliente.id(), cliente.atendenteId(), br.com.archat.dominio.auditoria.AcaoDeAuditoria.ENTREGA_CRIADA,
+                        "Entrega de " + criada.nomeCliente() + " · " + criada.endereco(), "Valor R$ " + criada.valor());
+                AuditoriaDaRequisicao.detalhe("Com entrega gerada");
+            }
+        }
         return resposta(cliente, id);
+    }
+
+    record FinishRequest(String destination, String note, DeliveryRequest delivery) {
+    }
+
+    record DeliveryRequest(String address, String order, List<DeliveryItemRequest> items, BigDecimal value, String paymentMethod,
+                           String note) {
+        List<ItemDeEntrega> itens() {
+            return items == null ? List.of() : items.stream().map(i -> new ItemDeEntrega(i.productId(), i.name(),
+                    i.quantity() == null ? 0 : i.quantity(), i.unitPrice() == null ? BigDecimal.ZERO : i.unitPrice())).toList();
+        }
+    }
+
+    record DeliveryItemRequest(String productId, String name, Integer quantity, BigDecimal unitPrice) {
     }
 
     @PostMapping("/{id}/read")
@@ -217,7 +274,8 @@ class ConversaController {
     @GetMapping("/{id}/messages")
     @Operation(summary = "Mensagens de uma conversa, em ordem cronológica")
     List<MessageResponse> mensagens(ClienteAutenticado cliente, @PathVariable UUID id) {
-        return mensagens.listar(new FiltroMensagens(cliente.id(), id, null, null)).stream()
-                .map(MessageResponse::de).toList();
+        var lista = mensagens.listar(new FiltroMensagens(cliente.id(), id, null, null));
+        var pedidos = entregas.itensPorMensagem(lista.stream().map(m -> m.id()).toList());
+        return lista.stream().map(m -> MessageResponse.de(m).comPedido(MessageResponse.Order.de(pedidos.get(m.id())))).toList();
     }
 }

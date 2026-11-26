@@ -20,11 +20,13 @@ public class DepartamentoEntity {
     private boolean ativo;
     @Column(name = "criado_em")
     private Instant criadoEm;
+    private boolean geral;
 
     protected DepartamentoEntity() {
     }
 
-    public DepartamentoEntity(UUID id, UUID clienteId, String nome, boolean ativo, Instant criadoEm) {
+    public DepartamentoEntity(UUID id, UUID clienteId, String nome, boolean ativo, Instant criadoEm, boolean geral) {
+        this.geral = geral;
         this.id = id;
         this.clienteId = clienteId;
         this.nome = nome;
@@ -37,4 +39,5 @@ public class DepartamentoEntity {
     public String getNome() { return nome; }
     public boolean isAtivo() { return ativo; }
     public Instant getCriadoEm() { return criadoEm; }
+    public boolean isGeral() { return geral; }
 }

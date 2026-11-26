@@ -23,7 +23,7 @@ public final class CampanhaDtos {
     public record CreateCampaignRequest(@NotBlank @Size(max = 120) String name,
                                         @Size(max = Mensagem.TAMANHO_MAXIMO) String content,
                                         @Valid MensagemDtos.MediaRequest media, @NotBlank String priority, List<UUID> recipientIds, Boolean allOptedIn,
-                                        String channel) {
+                                        String channel, Instant scheduledAt, Integer intervalSeconds, String tag) {
 
         public boolean todosQueAceitam() {
             return Boolean.TRUE.equals(allOptedIn);
@@ -42,7 +42,8 @@ public final class CampanhaDtos {
 
     public record CampaignResponse(UUID id, String name, String content, MensagemDtos.MediaResponse media,
                                    String priority, int totalRecipients,
-                                   BigDecimal totalCost, Instant createdAt, Map<String, Long> messagesByStatus) {
+                                   BigDecimal totalCost, Instant createdAt, Map<String, Long> messagesByStatus,
+                                   Instant scheduledAt, int intervalSeconds, String tag) {
 
         public static CampaignResponse de(AndamentoCampanha andamento) {
             Campanha c = andamento.campanha();
@@ -50,7 +51,10 @@ public final class CampanhaDtos {
             andamento.mensagensPorStatus().forEach((status, total) -> porStatus.put(ApiEnums.status(status), total));
             return new CampaignResponse(c.id(), c.nome(), c.conteudo(), MensagemDtos.MediaResponse.de(c.midia()),
                     ApiEnums.prioridade(c.prioridade()),
-                    c.totalDestinatarios(), c.custoTotal(), c.criadaEm(), porStatus);
+                    c.totalDestinatarios(), c.custoTotal(), c.criadaEm(), porStatus,
+                    andamento.envio() == null ? null : andamento.envio().agendadaPara(),
+                    andamento.envio() == null ? 0 : andamento.envio().intervaloSegundos(),
+                    andamento.envio() == null ? null : andamento.envio().etiqueta());
         }
     }
 }

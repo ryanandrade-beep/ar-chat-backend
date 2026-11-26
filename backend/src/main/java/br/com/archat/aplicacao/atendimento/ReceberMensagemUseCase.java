@@ -1,7 +1,10 @@
 package br.com.archat.aplicacao.atendimento;
 
 import br.com.archat.aplicacao.departamento.AtendimentoAutomatico;
+import br.com.archat.aplicacao.integracao.DadosDosEventos;
 import br.com.archat.aplicacao.porta.ConexaoWhatsApp;
+import br.com.archat.aplicacao.porta.NotificadorDeIntegracao;
+import br.com.archat.dominio.integracao.EventoDeIntegracao;
 import br.com.archat.aplicacao.porta.ConversaRepositorio;
 import br.com.archat.aplicacao.porta.DestinatarioRepositorio;
 import br.com.archat.aplicacao.porta.MensagemRepositorio;
@@ -9,6 +12,8 @@ import br.com.archat.aplicacao.porta.UnidadeDeTrabalho;
 import br.com.archat.dominio.atendimento.Atendimento;
 import br.com.archat.dominio.conversa.Conversa;
 import br.com.archat.dominio.conversa.Destinatario;
+import br.com.archat.dominio.conversa.TipoDestinatario;
+import br.com.archat.dominio.excecao.RegraDeNegocioException;
 import br.com.archat.dominio.excecao.RecursoNaoEncontradoException;
 import br.com.archat.dominio.mensagem.ContatoCompartilhado;
 import br.com.archat.dominio.mensagem.Mensagem;
@@ -18,7 +23,9 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -28,7 +35,6 @@ import java.util.UUID;
  * atualiza o atendimento (status "aguardando"). Não tem custo e não passa pela fila.
  */
 public class ReceberMensagemUseCase {
-
     private final DestinatarioRepositorio destinatarios;
     private final ConversaRepositorio conversas;
     private final MensagemRepositorio mensagens;
@@ -37,6 +43,7 @@ public class ReceberMensagemUseCase {
     private final Clock relogio;
     private final AtendimentoAutomatico ura;
     private final ConexaoWhatsApp canal;
+    private NotificadorDeIntegracao integracoes = NotificadorDeIntegracao.NENHUM;
 
     public ReceberMensagemUseCase(DestinatarioRepositorio destinatarios, ConversaRepositorio conversas,
                                   MensagemRepositorio mensagens, RegistroDeAtendimento atendimentos,
@@ -59,12 +66,14 @@ public class ReceberMensagemUseCase {
     }
 
     public Mensagem simularResposta(UUID clienteId, UUID conversaId, String conteudo) {
-        return unidadeDeTrabalho.executar(() -> {
+        Registro registro = unidadeDeTrabalho.executar(() -> {
             Conversa conversa = conversas.buscarPorId(conversaId)
                     .filter(c -> c.pertenceA(clienteId))
                     .orElseThrow(() -> new RecursoNaoEncontradoException("Conversa"));
-            return registrar(conversa, conteudo, null, null, relogio.instant()).mensagem();
+            return registrar(conversa, conteudo, null, null, relogio.instant());
         });
+        avisarIntegracao(registro);
+        return registro.mensagem();
     }
 
     public Optional<Mensagem> doCanal(String telefoneOuGrupo, String conteudo, String idExterno, Instant quando) {
@@ -78,36 +87,65 @@ public class ReceberMensagemUseCase {
 
     public Optional<Mensagem> doCanal(UUID clienteId, String telefoneOuGrupo, String conteudo, Midia midia,
                                       String idExterno, Instant quando) {
+        return doCanal(clienteId, telefoneOuGrupo, null, conteudo, midia, idExterno, quando);
+    }
+
+    public Optional<Mensagem> doCanal(UUID clienteId, String telefoneOuGrupo, String nomeDoRemetente, String conteudo,
+                                      Midia midia, String idExterno, Instant quando) {
         if (idExterno != null && mensagens.buscarPorIdExterno(idExterno).isPresent()) {
             return Optional.empty();
         }
-        Optional<Registro> registro = unidadeDeTrabalho.executar(() -> conversaDoRemetente(clienteId, telefoneOuGrupo)
+        Optional<Registro> registro = unidadeDeTrabalho.executar(() -> conversaDoRemetente(clienteId, telefoneOuGrupo, nomeDoRemetente)
                 .map(conversa -> registrar(conversa, conteudo, midia, idExterno,
                         quando == null ? relogio.instant() : quando)));
+        registro.ifPresent(this::avisarIntegracao);
         registro.ifPresent(r -> enviarRespostasDaUra(r.clienteId(), r.telefone(), r.respostasDaUra()));
         return registro.map(Registro::mensagem);
     }
 
     public Optional<Mensagem> contatoDoCanal(UUID clienteId, String telefoneOuGrupo, ContatoCompartilhado contato,
                                              String idExterno, Instant quando) {
+        return contatoDoCanal(clienteId, telefoneOuGrupo, null, contato, idExterno, quando);
+    }
+
+    public Optional<Mensagem> contatoDoCanal(UUID clienteId, String telefoneOuGrupo, String nomeDoRemetente,
+                                             ContatoCompartilhado contato, String idExterno, Instant quando) {
         if (idExterno != null && mensagens.buscarPorIdExterno(idExterno).isPresent()) {
             return Optional.empty();
         }
         Instant momento = quando == null ? relogio.instant() : quando;
-        Optional<Registro> registro = unidadeDeTrabalho.executar(() -> conversaDoRemetente(clienteId, telefoneOuGrupo)
+        Optional<Registro> registro = unidadeDeTrabalho.executar(() -> conversaDoRemetente(clienteId, telefoneOuGrupo, nomeDoRemetente)
                 .map(conversa -> registrarMensagem(conversa, Mensagem.contatoRecebido(conversa.id(), contato, idExterno, momento),
                         momento)));
+        registro.ifPresent(this::avisarIntegracao);
         registro.ifPresent(r -> enviarRespostasDaUra(r.clienteId(), r.telefone(), r.respostasDaUra()));
         return registro.map(Registro::mensagem);
     }
 
-    private Optional<Conversa> conversaDoRemetente(UUID clienteId, String telefoneOuGrupo) {
+    private Optional<Conversa> conversaDoRemetente(UUID clienteId, String telefoneOuGrupo, String nomeDoRemetente) {
         List<Destinatario> candidatos = destinatarios.buscarPorTelefones(variacoes(telefoneOuGrupo)).stream()
                 .filter(d -> clienteId == null || d.clienteId().equals(clienteId))
                 .toList();
+        if (candidatos.isEmpty() && clienteId != null) {
+            candidatos = cadastrarRemetente(clienteId, telefoneOuGrupo, nomeDoRemetente).map(List::of).orElse(List.of());
+        }
         return candidatos.stream()
                 .map(d -> conversas.buscarPorDestinatario(d.id()).orElseGet(() -> Conversa.iniciar(d.clienteId(), d.id())))
                 .max(Comparator.comparing(c -> c.dataUltimaMensagem() == null ? Instant.EPOCH : c.dataUltimaMensagem()));
+    }
+
+    private Optional<Destinatario> cadastrarRemetente(UUID clienteId, String telefoneOuGrupo, String nome) {
+        String endereco = telefoneOuGrupo == null ? "" : telefoneOuGrupo.strip();
+        TipoDestinatario tipo = endereco.contains("-") ? TipoDestinatario.GRUPO : TipoDestinatario.CONTATO;
+        String rotulo = nome == null || nome.isBlank() ? endereco : nome.strip();
+        try {
+            Destinatario novo = Destinatario.novo(clienteId, tipo, rotulo.length() > 120 ? rotulo.substring(0, 120) : rotulo,
+                    endereco, false);
+            destinatarios.salvar(novo);
+            return Optional.of(novo);
+        } catch (RegraDeNegocioException e) {
+            return Optional.empty();
+        }
     }
 
     private static Set<String> variacoes(String telefoneOuGrupo) {
@@ -134,7 +172,8 @@ public class ReceberMensagemUseCase {
         List<String> respostas = ura == null || destinatario == null ? List.of()
                 : ura.aoReceber(conversa, destinatario, atendimento, mensagem, quando);
         conversas.salvar(conversa);
-        return new Registro(mensagem, conversa.clienteId(), destinatario == null ? null : destinatario.telefone(), respostas);
+        return new Registro(mensagem, conversa.clienteId(), destinatario == null ? null : destinatario.telefone(), respostas,
+                destinatario == null ? null : destinatario.nome(), atendimento == null ? null : atendimento.id());
     }
 
     private void enviarRespostasDaUra(UUID clienteId, String telefone, List<String> respostas) {
@@ -150,6 +189,21 @@ public class ReceberMensagemUseCase {
         }
     }
 
-    private record Registro(Mensagem mensagem, UUID clienteId, String telefone, List<String> respostasDaUra) {
+    public ReceberMensagemUseCase comIntegracoes(NotificadorDeIntegracao notificador) {
+        this.integracoes = notificador == null ? NotificadorDeIntegracao.NENHUM : notificador;
+        return this;
+    }
+
+    private void avisarIntegracao(Registro r) {
+        Map<String, Object> dados = new LinkedHashMap<>();
+        dados.put("conversationId", r.mensagem().conversaId().toString());
+        dados.put("attendanceId", r.atendimentoId() == null ? null : r.atendimentoId().toString());
+        dados.put("contact", DadosDosEventos.contato(r.nome(), r.telefone()));
+        dados.put("message", DadosDosEventos.mensagem(r.mensagem()));
+        integracoes.notificar(r.clienteId(), EventoDeIntegracao.MENSAGEM_RECEBIDA, dados);
+    }
+
+    private record Registro(Mensagem mensagem, UUID clienteId, String telefone, List<String> respostasDaUra, String nome,
+                            UUID atendimentoId) {
     }
 }

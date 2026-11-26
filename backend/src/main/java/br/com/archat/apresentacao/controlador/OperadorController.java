@@ -1,6 +1,8 @@
 package br.com.archat.apresentacao.controlador;
 
+import br.com.archat.aplicacao.operador.GerenciarDepartamentosDoOperadorUseCase;
 import br.com.archat.aplicacao.operador.GerenciarOperadoresUseCase;
+import br.com.archat.apresentacao.seguranca.AuditoriaDaRequisicao;
 import br.com.archat.apresentacao.seguranca.ClienteAutenticado;
 import br.com.archat.dominio.cliente.Operador;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -29,15 +32,19 @@ import java.util.UUID;
 class OperadorController {
 
     private final GerenciarOperadoresUseCase operadores;
+    private final GerenciarDepartamentosDoOperadorUseCase departamentos;
 
-    OperadorController(GerenciarOperadoresUseCase operadores) {
+    OperadorController(GerenciarOperadoresUseCase operadores, GerenciarDepartamentosDoOperadorUseCase departamentos) {
+        this.departamentos = departamentos;
         this.operadores = operadores;
     }
 
     @GetMapping
     @Operation(summary = "Operadores da workspace (o dono e os operadores podem listar, para transferir conversas)")
     List<OperatorResponse> listar(ClienteAutenticado cliente) {
-        return operadores.listar(cliente.id()).stream().map(OperatorResponse::de).toList();
+        Map<UUID, List<UUID>> vinculos = departamentos.doCliente(cliente.id());
+        return operadores.listar(cliente.id()).stream()
+                .map(o -> OperatorResponse.de(o, vinculos.getOrDefault(o.id(), List.of()))).toList();
     }
 
     @PostMapping
@@ -45,17 +52,24 @@ class OperadorController {
     @Operation(summary = "Cadastra um operador com login (e-mail) e senha próprios (somente o dono)")
     OperatorResponse cadastrar(ClienteAutenticado cliente, @Valid @RequestBody CreateOperatorRequest r) {
         cliente.exigirGestor();
-        return OperatorResponse.de(operadores.cadastrar(cliente.id(), r.name(), r.email(), r.password()));
+        var criado = operadores.cadastrar(cliente.id(), r.name(), r.email(), r.password());
+        AuditoriaDaRequisicao.recurso("Operador " + criado.nome());
+        return OperatorResponse.de(criado, r.departmentIds() == null ? List.of()
+                : departamentos.definir(cliente.id(), criado.id(), r.departmentIds()));
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Altera o nome e ativa ou desativa o operador (somente o dono)")
+    @Operation(summary = "Altera o nome e o e-mail de login e ativa ou desativa o operador (somente o dono)")
     OperatorResponse alterar(ClienteAutenticado cliente, @PathVariable UUID id, @Valid @RequestBody UpdateOperatorRequest r) {
         cliente.exigirGestor();
         if (operadores.buscar(cliente.id(), id).dono()) {
             throw new br.com.archat.dominio.excecao.RegraDeNegocioException("O perfil do responsável não pode ser alterado aqui");
         }
-        return OperatorResponse.de(operadores.alterar(cliente.id(), id, r.name(), r.active()));
+        var alterado = operadores.alterar(cliente.id(), id, r.name(), r.email(), r.active());
+        List<UUID> vinculados = r.departmentIds() == null
+                ? departamentos.doCliente(cliente.id()).getOrDefault(id, List.of())
+                : departamentos.definir(cliente.id(), id, r.departmentIds());
+        return OperatorResponse.de(alterado, vinculados);
     }
 
     @PutMapping("/{id}/password")
@@ -69,19 +83,23 @@ class OperadorController {
         operadores.redefinirSenha(cliente.id(), id, r.password());
     }
 
-    record CreateOperatorRequest(@NotBlank @Size(max = 120) String name, @NotBlank String email, @NotBlank String password) {
+    record CreateOperatorRequest(@NotBlank @Size(max = 120) String name, @NotBlank String email, @NotBlank String password,
+                                 List<UUID> departmentIds) {
     }
 
-    record UpdateOperatorRequest(@NotBlank @Size(max = 120) String name, @NotNull Boolean active) {
+    record UpdateOperatorRequest(@NotBlank @Size(max = 120) String name, String email, @NotNull Boolean active,
+                                 List<UUID> departmentIds) {
     }
 
     record PasswordRequest(@NotBlank String password) {
     }
 
-    record OperatorResponse(UUID id, String name, String email, boolean active, Instant createdAt, boolean owner) {
+    record OperatorResponse(UUID id, String name, String email, boolean active, Instant createdAt, boolean owner,
+                            List<UUID> departmentIds) {
 
-        static OperatorResponse de(Operador o) {
-            return new OperatorResponse(o.id(), o.nome(), o.dono() ? null : o.email(), o.ativo(), o.criadoEm(), o.dono());
+        static OperatorResponse de(Operador o, List<UUID> departamentos) {
+            return new OperatorResponse(o.id(), o.nome(), o.dono() ? null : o.email(), o.ativo(), o.criadoEm(), o.dono(),
+                    departamentos);
         }
     }
 }

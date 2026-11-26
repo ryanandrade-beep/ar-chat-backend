@@ -10,6 +10,8 @@ public interface DepartamentoJpa extends JpaRepository<DepartamentoEntity, UUID>
 
     List<DepartamentoEntity> findByClienteId(UUID clienteId);
 
+    java.util.Optional<DepartamentoEntity> findFirstByClienteIdAndGeralTrue(UUID clienteId);
+
     boolean existsByClienteIdAndNomeIgnoreCase(UUID clienteId, String nome);
 
     boolean existsByClienteIdAndNomeIgnoreCaseAndIdNot(UUID clienteId, String nome, UUID id);

@@ -4,6 +4,7 @@ import br.com.archat.aplicacao.cliente.AtualizarClienteUseCase;
 import br.com.archat.aplicacao.cliente.CadastrarClienteUseCase;
 import br.com.archat.aplicacao.cliente.ConsultarClientesUseCase;
 import br.com.archat.aplicacao.cliente.ConsultarExtratoUseCase;
+import br.com.archat.dominio.financeiro.TipoTransacao;
 import br.com.archat.aplicacao.operador.ConsultarEquipeUseCase;
 import br.com.archat.aplicacao.cliente.GerenciarFinanceiroUseCase;
 import br.com.archat.apresentacao.dto.ApiEnums;
@@ -84,6 +85,26 @@ class ClienteController {
     List<TransactionResponse> meuExtrato(ClienteAutenticado cliente, @RequestParam(defaultValue = "30") int limit) {
         cliente.exigirGestor();
         return extrato.ultimas(cliente.id(), limit).stream().map(TransactionResponse::de).toList();
+    }
+
+    @GetMapping("/me/payments")
+    @Operation(summary = "Histórico de pagamentos do cliente autenticado: recargas de crédito (credit) e mensalidades do plano "
+            + "(monthly_fee). Filtros: from e to (datas; padrão últimos 12 meses) e type")
+    List<TransactionResponse> meusPagamentos(ClienteAutenticado cliente,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+            @RequestParam(required = false) String type) {
+        cliente.exigirGestor();
+        java.time.ZoneId fuso = java.time.ZoneId.of("America/Sao_Paulo");
+        java.time.LocalDate ate = to == null ? java.time.LocalDate.now(fuso) : to;
+        java.time.LocalDate de = from == null ? ate.minusMonths(12) : from;
+        TipoTransacao tipo = type == null || type.isBlank() ? null : switch (type) {
+            case "credit" -> TipoTransacao.CREDITO;
+            case "monthly_fee" -> TipoTransacao.MENSALIDADE;
+            default -> throw new br.com.archat.dominio.excecao.RegraDeNegocioException("type deve ser credit ou monthly_fee");
+        };
+        return extrato.pagamentos(cliente.id(), de.atStartOfDay(fuso).toInstant(), ate.plusDays(1).atStartOfDay(fuso).toInstant(), tipo)
+                .stream().map(TransactionResponse::de).toList();
     }
 
     @GetMapping("/{id}")

@@ -9,9 +9,9 @@ import java.util.UUID;
 
 public interface OperadorJpa extends JpaRepository<OperadorEntity, UUID> {
 
-    Optional<OperadorEntity> findByEmail(String email);
+    List<OperadorEntity> findAllByEmail(String email);
 
     List<OperadorEntity> findByClienteId(UUID clienteId);
 
-    boolean existsByEmail(String email);
+    boolean existsByClienteIdAndEmail(UUID clienteId, String email);
 }

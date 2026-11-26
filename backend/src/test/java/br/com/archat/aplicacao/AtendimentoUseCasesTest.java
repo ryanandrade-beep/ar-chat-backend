@@ -87,6 +87,17 @@ class AtendimentoUseCasesTest {
     }
 
     @Test
+    void remetenteDesconhecidoDeUmaEmpresaViraContatoEAparecenoChat() {
+        var mensagem = receber.doCanal(mercado.id(), "5511911112222", "Maria", "Quem é?", null, "Z9", relogio.instant());
+
+        assertThat(mensagem).isPresent();
+        var cadastrado = destinatarios.buscarPorClienteETelefone(mercado.id(), "5511911112222");
+        assertThat(cadastrado).isPresent();
+        assertThat(cadastrado.get().nome()).isEqualTo("Maria");
+        assertThat(cadastrado.get().aceitaOfertas()).isFalse();
+    }
+
+    @Test
     void mensagemRepetidaOuDeNumeroDesconhecidoEhIgnorada() {
         receber.doCanal("5544999990000", "Oi", "Z1", relogio.instant());
 

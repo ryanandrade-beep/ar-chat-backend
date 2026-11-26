@@ -1,6 +1,7 @@
 package br.com.archat.apresentacao.controlador;
 
 import br.com.archat.aplicacao.destinatario.GerenciarDestinatariosUseCase;
+import br.com.archat.aplicacao.destinatario.GerenciarEtiquetasUseCase;
 import br.com.archat.aplicacao.destinatario.ImportarContatosUseCase;
 import br.com.archat.aplicacao.porta.ConexaoWhatsApp;
 import br.com.archat.apresentacao.dto.DestinatarioDtos.RecipientRequest;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -33,8 +35,11 @@ class DestinatarioController {
 
     private final GerenciarDestinatariosUseCase destinatarios;
     private final ImportarContatosUseCase importar;
+    private final GerenciarEtiquetasUseCase etiquetas;
 
-    DestinatarioController(GerenciarDestinatariosUseCase destinatarios, ImportarContatosUseCase importar) {
+    DestinatarioController(GerenciarDestinatariosUseCase destinatarios, ImportarContatosUseCase importar,
+                           GerenciarEtiquetasUseCase etiquetas) {
+        this.etiquetas = etiquetas;
         this.destinatarios = destinatarios;
         this.importar = importar;
     }
@@ -70,26 +75,39 @@ class DestinatarioController {
     @GetMapping
     @Operation(summary = "Lista os contatos do cliente")
     List<RecipientResponse> listar(ClienteAutenticado cliente) {
-        return destinatarios.listar(cliente.id()).stream().map(RecipientResponse::de).toList();
+        Map<UUID, List<String>> porContato = etiquetas.doCliente(cliente.id());
+        return destinatarios.listar(cliente.id()).stream()
+                .map(d -> RecipientResponse.de(d, porContato.getOrDefault(d.id(), List.of()))).toList();
+    }
+
+    @GetMapping("/tags")
+    @Operation(summary = "Etiquetas já usadas nos contatos do cliente (para filtrar o público das campanhas)")
+    List<String> etiquetas(ClienteAutenticado cliente) {
+        return etiquetas.disponiveis(cliente.id());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Cadastra um contato")
     RecipientResponse cadastrar(ClienteAutenticado cliente, @Valid @RequestBody RecipientRequest r) {
-        return RecipientResponse.de(destinatarios.cadastrar(cliente.id(), r.tipo(), r.name(), r.phone(), r.aceitaOfertas()));
+        var criado = destinatarios.cadastrar(cliente.id(), r.tipo(), r.name(), r.phone(), r.aceitaOfertas());
+        return RecipientResponse.de(criado, r.tags() == null ? List.of() : etiquetas.definir(cliente.id(), criado.id(), r.tags()));
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Detalhes de um contato")
     RecipientResponse buscar(ClienteAutenticado cliente, @PathVariable UUID id) {
-        return RecipientResponse.de(destinatarios.buscar(cliente.id(), id));
+        return RecipientResponse.de(destinatarios.buscar(cliente.id(), id),
+                etiquetas.doCliente(cliente.id()).getOrDefault(id, List.of()));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Altera um contato")
     RecipientResponse alterar(ClienteAutenticado cliente, @PathVariable UUID id, @Valid @RequestBody RecipientRequest r) {
-        return RecipientResponse.de(destinatarios.alterar(cliente.id(), id, r.tipo(), r.name(), r.phone(), r.aceitaOfertas()));
+        var alterado = destinatarios.alterar(cliente.id(), id, r.tipo(), r.name(), r.phone(), r.aceitaOfertas());
+        List<String> tags = r.tags() == null ? etiquetas.doCliente(cliente.id()).getOrDefault(id, List.of())
+                : etiquetas.definir(cliente.id(), id, r.tags());
+        return RecipientResponse.de(alterado, tags);
     }
 
     @DeleteMapping("/{id}")

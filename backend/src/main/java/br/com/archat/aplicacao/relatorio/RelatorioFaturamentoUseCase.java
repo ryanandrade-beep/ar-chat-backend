@@ -43,6 +43,10 @@ public class RelatorioFaturamentoUseCase {
     }
 
     public Faturamento emitir(Periodo periodo) {
+        return emitir(periodo, Filtro.NENHUM);
+    }
+
+    public Faturamento emitir(Periodo periodo, Filtro filtro) {
         List<TotalPorCliente> financeiro = transacoes.totalizarPorCliente(periodo.de(), periodo.ate());
         List<ContagemPorCliente> contagens = mensagens.contarPorCliente(periodo.de(), periodo.ate());
         Map<UUID, Cliente> clientesPorId = clientes.listarTodos().stream()
@@ -54,6 +58,8 @@ public class RelatorioFaturamentoUseCase {
 
         List<LinhaSemParticipacao> linhas = ativos.stream()
                 .filter(clientesPorId::containsKey)
+                .filter(id -> filtro.plano() == null || clientesPorId.get(id).tipoPlano() == filtro.plano())
+                .filter(id -> RelatorioAtendimentosUseCase.contem(clientesPorId.get(id).nome(), filtro.busca()))
                 .map(id -> linha(clientesPorId.get(id), financeiro, contagens))
                 .toList();
         BigDecimal receitaTotal = linhas.stream().map(LinhaSemParticipacao::receitaLiquida).reduce(ZERO, BigDecimal::add);
@@ -97,6 +103,11 @@ public class RelatorioFaturamentoUseCase {
 
     private static BigDecimal percentual(BigDecimal parte, BigDecimal todo) {
         return todo.signum() == 0 ? ZERO : parte.multiply(CEM).divide(todo, 2, RoundingMode.HALF_EVEN);
+    }
+
+    public record Filtro(TipoPlano plano, String busca) {
+
+        public static final Filtro NENHUM = new Filtro(null, null);
     }
 
     private record LinhaSemParticipacao(UUID clienteId, String nome, TipoPlano tipoPlano, long mensagens,

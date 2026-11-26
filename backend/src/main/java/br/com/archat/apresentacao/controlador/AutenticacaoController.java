@@ -1,7 +1,9 @@
 package br.com.archat.apresentacao.controlador;
 
 import br.com.archat.aplicacao.autenticacao.AutenticarAdministradorUseCase;
+import br.com.archat.aplicacao.auditoria.RegistrarAuditoriaUseCase;
 import br.com.archat.aplicacao.autenticacao.AutenticarClienteUseCase;
+import br.com.archat.dominio.auditoria.AcaoDeAuditoria;
 import br.com.archat.aplicacao.conta.CadastrarContaUseCase;
 import br.com.archat.aplicacao.conta.RecuperarSenhaUseCase;
 import br.com.archat.aplicacao.operador.GerenciarOperadoresUseCase;
@@ -33,11 +35,13 @@ class AutenticacaoController {
     private final CadastrarContaUseCase cadastrarConta;
     private final RecuperarSenhaUseCase recuperarSenha;
     private final GerenciarOperadoresUseCase equipe;
+    private final RegistrarAuditoriaUseCase auditoria;
 
     AutenticacaoController(AutenticarClienteUseCase autenticarCliente,
                            AutenticarAdministradorUseCase autenticarAdministrador,
                            CadastrarContaUseCase cadastrarConta, RecuperarSenhaUseCase recuperarSenha,
-                           GerenciarOperadoresUseCase equipe) {
+                           GerenciarOperadoresUseCase equipe, RegistrarAuditoriaUseCase auditoria) {
+        this.auditoria = auditoria;
         this.equipe = equipe;
         this.autenticarCliente = autenticarCliente;
         this.autenticarAdministrador = autenticarAdministrador;
@@ -58,11 +62,12 @@ class AutenticacaoController {
     @PostMapping("/auth/login")
     @Operation(summary = "Autentica por e-mail e senha o dono da workspace ou um operador")
     ClientAuthResponse entrar(@Valid @RequestBody EmailLoginRequest r) {
-        var autenticado = autenticarCliente.porEmail(r.email(), r.password());
+        var autenticado = autenticarCliente.porEmail(r.email(), r.password(), r.companyDocument());
         var operador = autenticado.operador();
         if (operador == null) {
             return doDono(autenticado.token(), autenticado.cliente());
         }
+        auditoria.registrar(autenticado.cliente().id(), operador.id(), AcaoDeAuditoria.LOGIN, null, "Operador · e-mail e senha");
         return new ClientAuthResponse(autenticado.token(), ClientResponse.de(autenticado.cliente()), "operator",
                 operador.nome(), operador.id());
     }
@@ -90,8 +95,9 @@ class AutenticacaoController {
     }
 
     private ClientAuthResponse doDono(String token, br.com.archat.dominio.cliente.Cliente cliente) {
-        return new ClientAuthResponse(token, ClientResponse.de(cliente), "owner", cliente.nome(),
-                equipe.perfilDoDono(cliente.id(), cliente.nome()).id());
+        var perfil = equipe.perfilDoDono(cliente.id(), cliente.nome());
+        auditoria.registrar(cliente.id(), perfil.id(), AcaoDeAuditoria.LOGIN, null, "Responsável da conta");
+        return new ClientAuthResponse(token, ClientResponse.de(cliente), "owner", cliente.nome(), perfil.id());
     }
 
     @PostMapping("/admin/auth")

@@ -39,6 +39,7 @@ public class AtendimentoAutomatico {
         }
         List<Departamento> opcoes = departamentos.listarPorCliente(conversa.clienteId()).stream()
                 .filter(Departamento::ativo)
+                .filter(d -> !d.geral())
                 .sorted(Comparator.comparing(Departamento::nome, String.CASE_INSENSITIVE_ORDER))
                 .toList();
         if (opcoes.isEmpty()) {
@@ -58,7 +59,8 @@ public class AtendimentoAutomatico {
                 respostas.add("Certo! Você será atendido pelo departamento " + escolhido.get().nome()
                         + ". Aguarde um momento, por favor.");
             } else if (conversa.registrarTentativaInvalida() >= ura.maximoTentativas()) {
-                conversa.definirDepartamento(ura.departamentoPadraoId());
+                conversa.definirDepartamento(ura.departamentoPadraoId() != null ? ura.departamentoPadraoId()
+                        : departamentos.garantirGeral(conversa.clienteId()).id());
                 respostas.add("Vamos te encaminhar para um de nossos atendentes. Aguarde um momento, por favor.");
             } else {
                 respostas.add("Não entendi a opção. " + ura.menu(opcoes));

@@ -61,6 +61,9 @@ archat:
   webhook:
     # parte secreta da URL dos webhooks (ex.: https://.../webhooks/zapi/<segredo>/received)
     segredo: ${ARCHAT_WEBHOOK_SEGREDO:troque-este-segredo-do-webhook}
+    # endereço público HTTPS deste backend (ex.: https://abc.trycloudflare.com); quando informado, a cada partida os
+    # webhooks de todas as instâncias Z-API vinculadas são apontados para ele, sem mexer no painel da Z-API
+    url-publica: ${ARCHAT_URL_PUBLICA:}
   envio-simulado:
     atraso-minimo: 300ms
     atraso-maximo: 1200ms

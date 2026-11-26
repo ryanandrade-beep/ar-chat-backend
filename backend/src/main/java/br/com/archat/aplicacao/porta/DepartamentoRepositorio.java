@@ -9,12 +9,13 @@ import java.util.UUID;
 
 /** Departamentos e a configuração da URA de cada workspace. */
 public interface DepartamentoRepositorio {
-
     void salvar(Departamento departamento);
 
     Optional<Departamento> buscarPorId(UUID id);
 
     List<Departamento> listarPorCliente(UUID clienteId);
+
+    Departamento garantirGeral(UUID clienteId);
 
     boolean existeComNome(UUID clienteId, String nome, UUID exceto);
 

@@ -33,8 +33,8 @@ class OperadorRepositorioJpa implements OperadorRepositorio {
     }
 
     @Override
-    public Optional<Operador> buscarPorEmail(String email) {
-        return jpa.findByEmail(email).map(OperadorRepositorioJpa::paraDominio);
+    public List<Operador> listarPorEmail(String email) {
+        return jpa.findAllByEmail(email).stream().map(OperadorRepositorioJpa::paraDominio).toList();
     }
 
     @Override
@@ -43,8 +43,8 @@ class OperadorRepositorioJpa implements OperadorRepositorio {
     }
 
     @Override
-    public boolean existeComEmail(String email) {
-        return jpa.existsByEmail(email);
+    public boolean existeComEmailNaEmpresa(UUID clienteId, String email) {
+        return jpa.existsByClienteIdAndEmail(clienteId, email);
     }
 
     private static Operador paraDominio(OperadorEntity e) {

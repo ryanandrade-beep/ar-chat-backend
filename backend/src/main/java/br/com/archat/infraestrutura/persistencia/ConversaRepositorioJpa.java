@@ -1,6 +1,7 @@
 package br.com.archat.infraestrutura.persistencia;
 
 import br.com.archat.aplicacao.porta.ConversaRepositorio;
+import br.com.archat.aplicacao.porta.DepartamentoRepositorio;
 import br.com.archat.dominio.conversa.Conversa;
 import br.com.archat.infraestrutura.persistencia.entidade.ConversaEntity;
 import br.com.archat.infraestrutura.persistencia.jpa.ConversaJpa;
@@ -14,9 +15,11 @@ import java.util.UUID;
 class ConversaRepositorioJpa implements ConversaRepositorio {
 
     private final ConversaJpa jpa;
+    private final DepartamentoRepositorio departamentos;
 
-    ConversaRepositorioJpa(ConversaJpa jpa) {
+    ConversaRepositorioJpa(ConversaJpa jpa, DepartamentoRepositorio departamentos) {
         this.jpa = jpa;
+        this.departamentos = departamentos;
     }
 
     @Override
@@ -24,7 +27,8 @@ class ConversaRepositorioJpa implements ConversaRepositorio {
         ConversaEntity entidade = new ConversaEntity(c.id(), c.clienteId(), c.destinatarioId(), c.ultimaMensagem(),
                 c.dataUltimaMensagem(), c.naoLidas(), c.statusAtendimento());
         entidade.definirOperador(c.operadorId());
-        entidade.definirUra(c.departamentoId(), c.aguardandoUra(), c.tentativasUra());
+        UUID departamento = c.departamentoId() != null ? c.departamentoId() : departamentos.garantirGeral(c.clienteId()).id();
+        entidade.definirUra(departamento, c.aguardandoUra(), c.tentativasUra());
         jpa.save(entidade);
     }
 
