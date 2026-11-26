@@ -1,0 +1,106 @@
+@startuml
+!pragma layout smetana
+!include skin.iuml
+title Diagrama de Classes — Entregas, Integração e Auditoria
+hide empty members
+skinparam classAttributeIconSize 0
+
+class Cliente
+class Conversa
+class Destinatario
+class Operador
+class Entrega {
+  - id : UUID
+  - nomeCliente : String
+  - telefone : String
+  - endereco : String
+  - pedido : String
+  - valor : Decimal
+  - pagamento : pix | cartao | dinheiro | outro
+  - observacao : String
+  - status : StatusEntrega
+  - origem : OrigemEntrega
+  - criadaEm : DateTime
+  - saiuEm : DateTime
+  - entregueEm : DateTime
+  - canceladaEm : DateTime
+  - motivoCancelamento : String
+  + saiu(agora) : void
+  + entregue(agora) : void
+  + cancelar(agora, motivo) : void
+  + corrigirDados(endereco, observacao) : void
+}
+class ItemDeEntrega <<valor>> {
+  - produtoId : String
+  - nome : String
+  - quantidade : Integer
+  - valorUnitario : Decimal
+  - imagem : String
+}
+class ConfiguracaoDeEntrega {
+  - avisarSaida : Boolean
+  - mensagemSaida : String
+  - avisarEntregue : Boolean
+  - mensagemEntregue : String
+  - chavePix : String
+  - aceitaCartao : Boolean
+}
+enum StatusEntrega {
+  AGUARDANDO
+  A_CAMINHO
+  ENTREGUE
+  CANCELADA
+}
+enum OrigemEntrega {
+  OPERADOR
+  CATALOGO
+}
+class ConfiguracaoDeIntegracao {
+  - url : String
+  - segredo : String
+  - eventos : Set<EventoDeIntegracao>
+  - ativa : Boolean
+  + {static} validarUrl(url) : void
+}
+class EnvioDeIntegracao {
+  - id : UUID
+  - evento : EventoDeIntegracao
+  - payload : JSON
+  - status : PENDENTE | ENVIADO | FALHOU
+  - tentativas : Integer
+  - httpStatus : Integer
+  - proximaTentativa : DateTime
+  + {static} MAXIMO_DE_TENTATIVAS = 4
+}
+enum EventoDeIntegracao {
+  message.received
+  attendance.started
+  attendance.finished
+  delivery.dispatched
+  delivery.delivered
+  test.ping
+}
+class RegistroDeAuditoria {
+  - id : UUID
+  - autorId : UUID
+  - autorNome : String
+  - acao : AcaoDeAuditoria
+  - recurso : String
+  - detalhe : String
+  - criadaEm : DateTime
+}
+
+Cliente "1" -- "0..*" Entrega
+Conversa "1" -- "0..*" Entrega
+Destinatario "1" -- "0..*" Entrega
+Operador "0..1" -- "0..*" Entrega : gerou >
+Entrega "1" *-- "0..*" ItemDeEntrega
+Entrega --> StatusEntrega
+Entrega --> OrigemEntrega
+Cliente "1" -- "0..1" ConfiguracaoDeEntrega
+Cliente "1" -- "0..1" ConfiguracaoDeIntegracao
+Cliente "1" -- "0..*" EnvioDeIntegracao
+ConfiguracaoDeIntegracao ..> EventoDeIntegracao : assina
+EnvioDeIntegracao --> EventoDeIntegracao
+Cliente "1" -- "0..*" RegistroDeAuditoria
+@enduml

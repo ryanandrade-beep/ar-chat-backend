@@ -1,0 +1,25 @@
+@startuml
+!pragma layout smetana
+!include skin.iuml
+title Diagrama de Estados — Entrega
+hide empty description
+state "Aguardando" as Aguardando
+state "A caminho" as ACaminho
+[*] --> Aguardando : operador gera a entrega\n(ou o cliente final envia o pedido do catálogo)
+Aguardando --> ACaminho : saiu para entrega
+ACaminho --> Entregue : entregue
+Aguardando --> Cancelada : cancelar (motivo opcional)
+ACaminho --> Cancelada : cancelar (motivo opcional)
+Entregue --> [*]
+Cancelada --> [*]
+note right of ACaminho
+  Ao sair e ao entregar, o cliente final
+  recebe o aviso no WhatsApp (se ativado)
+  e a empresa recebe o evento
+  delivery.dispatched / delivery.delivered
+end note
+note bottom of Entregue
+  Entregue e cancelada são finais:
+  não podem mais ser alteradas
+end note
+@enduml

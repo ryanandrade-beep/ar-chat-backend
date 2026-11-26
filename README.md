@@ -14,7 +14,7 @@ ar-chat-backend/
 ├── docs/
 │   ├── 01-documento/             Entrega do Documento Final até Especificações de Requisitos.docx
 │   ├── 02-apresentacao/          Apresentação do Estágio I (.pptx, modelo UMFG)
-│   ├── 03-diagramas/             Casos de uso, classes, estados, atividades, sequência, DER, arquitetura (PNG)
+│   ├── 03-diagramas/             Casos de uso, classes, estados, atividades, sequência, DER e arquitetura (SVG e PNG)
 │   ├── 04-prototipos/            Protótipos das telas: atendimento, canal, campanha (PNG)
 │   ├── 05-postman/               Collection e ambiente do Postman (login automático)
 │   └── fontes/                   Fontes PlantUML dos diagramas, gerador do documento e script dos diagramas
@@ -85,6 +85,51 @@ encarte de ofertas em imagem).
 | `POST /webhooks/zapi/{segredo}/received` | Webhook "Ao receber" | Mensagens recebidas (texto e mídia) |
 | `POST /webhooks/zapi/{segredo}/status` | Webhook "Status da mensagem" | Entregue / lida |
 | Webhook "Ao receber" (`order`, `reviewOrder`, `reviewAndPay`) | Pedido do carrinho do catálogo e referências do pedido nativo |
+
+## Regras de negócio
+
+**Atendimento**
+- Cada conversa tem ciclos de atendimento: *aguardando*, *em andamento*, *em espera* e *finalizado*. Só um fica aberto por vez.
+- Mensagem do cliente final abre o atendimento ou o devolve para *aguardando*; resposta da empresa põe em *em andamento*. Só um atendimento *em espera* pode ser retomado.
+- Uma conversa que já tem responsável não pode ser passada por outro operador a uma terceira pessoa; os demais podem participar, anotar ou receber a transferência. Nota interna nunca vai para o WhatsApp.
+- Ao finalizar, a observação é opcional (até 500 caracteres) e o atendimento pode ir para um departamento ou para o **Geral**. Nova mensagem do cliente final depois disso abre um novo atendimento.
+- Campanha de marketing não abre atendimento.
+
+**Departamentos e URA**
+- O departamento **Geral** é o padrão: não pode ser editado nem desativado e recebe tudo o que não escolheu departamento.
+- A URA aceita de 1 a 10 tentativas; esgotadas, a conversa vai para o departamento padrão. Mensagens de até 1.000 caracteres.
+- O administrador vincula cada operador aos departamentos que ele atende.
+
+**Operadores e planos**
+- O operador não cria a própria conta: quem cria é o administrador da empresa, dentro do limite de operadores ativos do plano.
+- O e-mail e o nome do operador são únicos por empresa. O nome tem de 2 a 120 caracteres.
+
+**Cobrança de mensagens**
+- Pré-pago: debita do saldo. Pós-pago: debita do limite mensal, que não pode ficar abaixo do consumo do mês.
+- O preço vem do plano da empresa (normal ou urgente); mídia e contato custam o mesmo que texto. Cliente inativo não envia.
+- A mensagem tem no máximo 4.096 caracteres. Cobrança, transação e mensagem ficam na mesma transação; o envio tem 3 tentativas (contando a primeira) e a falha definitiva estorna o valor.
+- A fila dá prioridade às urgentes, mas a cada 3 urgentes seguidas sai uma normal (sem *starvation*).
+
+**Campanhas**
+- Tudo ou nada: precisa de saldo ou limite para a campanha inteira.
+- De 1 a 1.000 destinatários, só contatos que aceitam receber ofertas (LGPD). Nome de até 120 caracteres.
+- Pausa entre envios de 0 a 3.600 s; agendamento só no futuro e em até 90 dias; filtro opcional por etiqueta.
+
+**Contatos**
+- Etiquetas são normalizadas em minúsculas, com até 10 por contato.
+
+**Entregas**
+- Estados: *aguardando* → *a caminho* → *entregue*; *aguardando* e *a caminho* também podem ir para *cancelada*. *Entregue* e *cancelada* são finais.
+- Endereço de 5 a 300 caracteres, pedido de 2 a 1.000, valor de R$ 0,00 a R$ 99.999,99, observação até 500 e motivo do cancelamento até 300.
+- Forma de pagamento: `pix`, `cartao`, `dinheiro` ou `outro`. Entrega aberta só aceita corrigir endereço e observação.
+- Ao sair e ao entregar, o cliente final é avisado no WhatsApp (se ativado) e a empresa recebe o evento.
+
+**Integração (webhook de saída)**
+- A URL precisa ser `https`, pública e sem usuário e senha; é obrigatório marcar ao menos um evento.
+- São 4 envios no máximo (o primeiro e mais 3 tentativas, após 30 s, 2 min e 10 min); depois o envio fica como *falhou* e pode ser reenviado pelo painel.
+
+**Auditoria**
+- O backoffice vê, por empresa, quem fez o quê e quando: login, operadores, departamentos, URA, atendimentos, entregas, campanhas e integração.
 
 ## Como executar
 
@@ -169,13 +214,13 @@ Os scripts de exemplo foram escritos para o banco desta máquina (ids da empresa
 cd backend && ./mvnw verify   # unitários, arquitetura (ArchUnit) e integração (H2) — nunca usam a Z-API real
 ```
 
-### Diagramas e documento
+## Diagramas
+
+As fontes PlantUML ficam em `docs/fontes/diagramas`. Para regenerar as imagens:
 
 ```bash
-docs/fontes/gerar-diagramas.sh /caminho/plantuml.jar   # regenera 03-diagramas e 04-prototipos
+docs/fontes/gerar-diagramas.sh /caminho/completo/plantuml.jar   # gera 03-diagramas e 04-prototipos
 ```
-
-## Diagramas
 
 ### Casos de uso
 ![Diagrama de casos de uso](docs/03-diagramas/01-casos-de-uso.svg)
@@ -186,6 +231,12 @@ docs/fontes/gerar-diagramas.sh /caminho/plantuml.jar   # regenera 03-diagramas e
 ### Estados do atendimento
 ![Diagrama de estados do atendimento](docs/03-diagramas/08-estados-atendimento.svg)
 
+### Estados da entrega
+![Diagrama de estados da entrega](docs/03-diagramas/08b-estados-entrega.svg)
+
+### Estados da mensagem
+![Diagrama de estados da mensagem](docs/03-diagramas/03-estados-mensagem.svg)
+
 ### Atividades – enviar resposta do atendimento
 ![Diagrama de atividades](docs/03-diagramas/04-atividade-enviar-mensagem.svg)
 
@@ -195,20 +246,23 @@ docs/fontes/gerar-diagramas.sh /caminho/plantuml.jar   # regenera 03-diagramas e
 ### Sequência – processar a fila e confirmar a entrega
 ![Diagrama de sequência: processar a fila](docs/03-diagramas/05-sequencia-processar-fila.svg)
 
-### Estados da mensagem
-![Diagrama de estados da mensagem](docs/03-diagramas/03-estados-mensagem.svg)
-
 ### Classes – entidades do domínio
 ![Diagrama de classes: domínio](docs/03-diagramas/02a-classes-dominio.svg)
 
 ### Classes – cobrança, fila de envio e enumerações
 ![Diagrama de classes: cobrança e fila](docs/03-diagramas/02b-classes-cobranca-fila.svg)
 
-### Arquitetura
-![Arquitetura limpa do backend](docs/03-diagramas/07-arquitetura.svg)
+### Classes – planos, departamentos, URA e canal por empresa
+![Diagrama de classes: planos, departamentos, URA e canal](docs/03-diagramas/02c-classes-equipe-planos-ura.svg)
 
-### Modelo de entidade e relacionamento
-![DER](docs/03-diagramas/06-der.svg)
+### Classes – entregas, integração e auditoria
+![Diagrama de classes: entregas, integração e auditoria](docs/03-diagramas/02d-classes-entrega-integracao-auditoria.svg)
+
+### Arquitetura
+![Arquitetura do sistema](docs/03-diagramas/07-arquitetura.svg)
+
+### Entidade e relacionamento (DER)
+![Diagrama de entidade e relacionamento](docs/03-diagramas/06-der.svg)
 
 ### Protótipos
 ![Tela de atendimento](docs/04-prototipos/09-prototipo-atendimento.png)
@@ -228,13 +282,10 @@ As dependências apontam sempre para dentro; o teste `ArquiteturaLimpaTest` falh
 
 ### Decisões técnicas
 
-- **Atendimento**: cada conversa tem ciclos de atendimento com status próprio; mensagem do cliente final abre ou
-  volta para "aguardando", resposta da empresa põe "em andamento". Campanha de marketing não abre atendimento.
-- **Fila com prioridade e anti-starvation**: urgentes primeiro, uma normal a cada 3 urgentes; O(1).
-- **Consistência financeira**: cobrança, transação e mensagem na mesma transação, com bloqueio do cliente
-  (`SELECT … FOR UPDATE`); 3 tentativas (contando a primeira) e estorno na falha definitiva.
-- **Campanhas**: tudo ou nada, até 1.000 contatos, só com consentimento (LGPD); pausa configurável entre envios.
+- **Fila com prioridade**: duas filas FIFO (urgente e normal), com custo O(1) para enfileirar e retirar.
+- **Consistência financeira**: bloqueio do cliente (`SELECT … FOR UPDATE`) durante a cobrança.
 - **Canal como porta** (`EnvioMensagemGateway`): simulado ou Z-API; o WhatsApp Business entra como novo adaptador.
+- **Webhook de saída**: assinatura HMAC-SHA256 e despacho assíncrono com novas tentativas.
 
 ### Limitações / próximos passos
 
@@ -242,16 +293,3 @@ As dependências apontam sempre para dentro; o teste `ArquiteturaLimpaTest` falh
 - Envio de e-mail real (SMTP) — hoje o código de recuperação de senha vai para o log.
 - Chave de idempotência no envio (evitar cobrança duplicada em reenvio da mesma requisição).
 - Canal WhatsApp Business (API oficial) — "em breve".
-- Upload dos arquivos de mídia pelo painel — hoje a mídia é informada por link público.
-
-### Classes – entidades do domínio
-![Diagrama de classes: entidades do domínio](docs/03-diagramas/02a-classes-dominio.svg)
-
-### Classes – planos, departamentos, URA e canal por empresa
-![Diagrama de classes: planos, departamentos, URA e canal](docs/03-diagramas/02c-classes-equipe-planos-ura.svg)
-
-### Arquitetura
-![Arquitetura do sistema](docs/03-diagramas/07-arquitetura.svg)
-
-### Entidade e relacionamento (DER)
-![Diagrama de entidade e relacionamento](docs/03-diagramas/06-der.svg)
