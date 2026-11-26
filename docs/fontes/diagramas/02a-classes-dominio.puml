@@ -26,6 +26,7 @@ class Destinatario {
   - nome : String
   - telefone : String
   - aceitaOfertas : Boolean
+  - etiquetas : Set<String>
 }
 class Campanha {
   - id : UUID
@@ -35,6 +36,9 @@ class Campanha {
   - prioridade : Prioridade
   - totalDestinatarios : Integer
   - custoTotal : Decimal
+  - agendadaPara : DateTime
+  - intervaloSegundos : Integer
+  - etiqueta : String
   - criadaEm : DateTime
 }
 class Conversa {
@@ -79,8 +83,10 @@ class Atendimento {
   - origem : OrigemAtendimento
   - status : StatusAtendimento
   - abertoEm : DateTime
+  - iniciadoEm : DateTime
   - primeiraRespostaEm : DateTime
   - finalizadoEm : DateTime
+  - observacaoEncerramento : String
   - mensagensEnviadas : Integer
   - mensagensRecebidas : Integer
   + registrarEnvio(agora) : void

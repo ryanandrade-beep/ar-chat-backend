@@ -1,7 +1,6 @@
 @startuml
 !pragma layout smetana
 !include skin.iuml
-left to right direction
 skinparam usecase {
   BackgroundColor<<Movimentação>> #FDEBD3
   BorderColor<<Movimentação>> #B45309
@@ -22,16 +21,27 @@ rectangle "A&R Chat — funcionalidades adicionais" {
   usecase "UC14 Gerenciar Planos\ne Assinaturas" <<Adicional>> as UC14
   usecase "UC05 Realizar Atendimento" <<Movimentação>> as UC05
   usecase "URA: escolher departamento\n(ao receber mensagem)" <<Adicional>> as URA
+  usecase "UC18 Gerenciar Entregas\n(gerar, saiu, entregue, cancelar, cobrar)" <<Adicional>> as UC18
+  usecase "Receber pedido do\ncatálogo do WhatsApp" <<Adicional>> as CAT
+  usecase "UC19 Configurar Integração\n(webhook de saída para CRM)" <<Adicional>> as UC19
+  usecase "UC20 Consultar Auditoria" <<Adicional>> as UC20
+  usecase "UC21 Etiquetar Contatos" <<Adicional>> as UC21
 }
 Op <|-- Cli
 Op --> UC05
 Op --> UC16
+Op --> UC18
+Op --> UC21
 Cli --> UC13
+Cli --> UC19
 Cli --> UC15
 Cli --> UC17
 Adm --> UC14
+Adm --> UC20
 UC16 ..> UC05 : <<extend>>
 URA ..> UC05 : <<extend>>
+UC18 ..> UC05 : <<extend>>
+CAT ..> UC18 : <<extend>>
 UC15 ..> URA : configura
 legend right
   <back:#FDEBD3>   </back> Movimentação (escopo principal)

@@ -107,10 +107,12 @@ entity atendimento {
   * origem : varchar(13)
   * status : varchar(12)
   * aberto_em : timestamptz
+  iniciado_em : timestamptz
   primeira_resposta_em : timestamptz
   finalizado_em : timestamptz
   * mensagens_enviadas : integer
   * mensagens_recebidas : integer
+  observacao_encerramento : varchar(500)
 }
 entity administrador {
   * id : uuid <<PK>>
@@ -126,11 +128,13 @@ entity operador {
   --
   * cliente_id : uuid <<FK>>
   * nome : varchar(120)
-  * email : varchar(160) <<UK>>
+  * email : varchar(160)
   * senha_hash : varchar(100)
   * ativo : boolean
   * dono : boolean
   * criado_em : timestamptz
+  --
+  <<UK (cliente_id, email)>>
 }
 entity conversa_participante {
   * conversa_id : uuid <<PK, FK>>
@@ -163,6 +167,7 @@ entity departamento {
   * cliente_id : uuid <<FK>>
   * nome : varchar(60)
   * ativo : boolean
+  * geral : boolean
   * criado_em : timestamptz
 }
 entity configuracao_ura {
@@ -192,6 +197,102 @@ entity instancia_whatsapp {
   * token : varchar(128)
   * vinculada_em : timestamptz
 }
+entity destinatario_etiqueta {
+  * destinatario_id : uuid <<PK, FK>>
+  * etiqueta : varchar(30) <<PK>>
+}
+entity campanha_envio {
+  * campanha_id : uuid <<PK, FK>>
+  --
+  agendada_para : timestamptz
+  * intervalo_segundos : integer
+  etiqueta : varchar(30)
+}
+entity liberacao_pendente {
+  * mensagem_id : uuid <<PK, FK>>
+  --
+  * liberar_em : timestamptz
+}
+entity operador_departamento {
+  * operador_id : uuid <<PK, FK>>
+  * departamento_id : uuid <<PK, FK>>
+}
+entity entrega {
+  * id : uuid <<PK>>
+  --
+  * cliente_id : uuid <<FK>>
+  * destinatario_id : uuid <<FK>>
+  * conversa_id : uuid <<FK>>
+  operador_id : uuid
+  mensagem_id : uuid
+  * nome_cliente : varchar(120)
+  * telefone : varchar(40)
+  * endereco : varchar(300)
+  * pedido : varchar(1000)
+  valor : numeric(10,2)
+  pagamento : varchar(20)
+  observacao : varchar(500)
+  * status : varchar(12)
+  * origem : varchar(10)
+  * criada_em : timestamptz
+  saiu_em : timestamptz
+  entregue_em : timestamptz
+  cancelada_em : timestamptz
+  motivo_cancelamento : varchar(300)
+}
+entity entrega_item {
+  * entrega_id : uuid <<PK, FK>>
+  * posicao : integer <<PK>>
+  --
+  produto_id : varchar(60)
+  * nome : varchar(200)
+  * quantidade : integer
+  * valor_unitario : numeric(10,2)
+  imagem : varchar(1000)
+}
+entity configuracao_entrega {
+  * cliente_id : uuid <<PK, FK>>
+  --
+  * avisar_saida : boolean
+  * mensagem_saida : varchar(500)
+  * avisar_entregue : boolean
+  * mensagem_entregue : varchar(500)
+  pix_chave : varchar(140)
+  * aceita_cartao : boolean
+}
+entity integracao_webhook {
+  * cliente_id : uuid <<PK, FK>>
+  --
+  * url : varchar(500)
+  * segredo : varchar(100)
+  * eventos : varchar(500)
+  * ativa : boolean
+  * atualizada_em : timestamptz
+}
+entity integracao_envio {
+  * id : uuid <<PK>>
+  --
+  * cliente_id : uuid <<FK>>
+  * evento : varchar(60)
+  * payload : text
+  * status : varchar(12)
+  * tentativas : integer
+  http_status : integer
+  proxima_tentativa : timestamptz
+  * criado_em : timestamptz
+  enviado_em : timestamptz
+}
+entity auditoria {
+  * id : uuid <<PK>>
+  --
+  * cliente_id : uuid <<FK>>
+  autor_id : uuid
+  * autor_nome : varchar(120)
+  * acao : varchar(60)
+  recurso : varchar(200)
+  detalhe : varchar(500)
+  * criada_em : timestamptz
+}
 cliente ||--o| conta_acesso
 cliente ||--o{ conversa
 cliente ||--o{ destinatario
@@ -216,4 +317,17 @@ cliente ||--o| configuracao_ura
 departamento |o--o{ configuracao_ura
 cliente ||--o{ arquivo
 cliente ||--o| instancia_whatsapp
+destinatario ||--o{ destinatario_etiqueta
+campanha ||--o| campanha_envio
+mensagem ||--o| liberacao_pendente
+operador ||--o{ operador_departamento
+departamento ||--o{ operador_departamento
+cliente ||--o{ entrega
+conversa ||--o{ entrega
+destinatario ||--o{ entrega
+entrega ||--o{ entrega_item
+cliente ||--o| configuracao_entrega
+cliente ||--o| integracao_webhook
+cliente ||--o{ integracao_envio
+cliente ||--o{ auditoria
 @enduml
