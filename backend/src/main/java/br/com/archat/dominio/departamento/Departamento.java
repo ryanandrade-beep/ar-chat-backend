@@ -8,14 +8,17 @@ import java.util.UUID;
 
 /** Setor da workspace (ex.: Comercial, Financeiro, Entregas) para onde a URA encaminha o cliente final. */
 public class Departamento {
-
     private final UUID id;
     private final UUID clienteId;
     private String nome;
     private boolean ativo;
     private final Instant criadoEm;
+    private final boolean geral;
 
-    private Departamento(UUID id, UUID clienteId, String nome, boolean ativo, Instant criadoEm) {
+    public static final String NOME_DO_GERAL = "Geral";
+
+    private Departamento(UUID id, UUID clienteId, String nome, boolean ativo, Instant criadoEm, boolean geral) {
+        this.geral = geral;
         this.id = Objects.requireNonNull(id);
         this.clienteId = Objects.requireNonNull(clienteId);
         this.nome = nomeValido(nome);
@@ -24,11 +27,20 @@ public class Departamento {
     }
 
     public static Departamento novo(UUID clienteId, String nome, Instant agora) {
-        return new Departamento(UUID.randomUUID(), clienteId, nome, true, agora);
+        return new Departamento(UUID.randomUUID(), clienteId, nome, true, agora, false);
+    }
+
+    public static Departamento novoGeral(UUID clienteId, Instant agora) {
+        return new Departamento(UUID.randomUUID(), clienteId, NOME_DO_GERAL, true, agora, true);
     }
 
     public static Departamento reconstituir(UUID id, UUID clienteId, String nome, boolean ativo, Instant criadoEm) {
-        return new Departamento(id, clienteId, nome, ativo, criadoEm);
+        return new Departamento(id, clienteId, nome, ativo, criadoEm, false);
+    }
+
+    public static Departamento reconstituir(UUID id, UUID clienteId, String nome, boolean ativo, Instant criadoEm,
+                                            boolean geral) {
+        return new Departamento(id, clienteId, nome, ativo, criadoEm, geral);
     }
 
     private static String nomeValido(String nome) {
@@ -39,6 +51,9 @@ public class Departamento {
     }
 
     public void alterar(String nome, boolean ativo) {
+        if (geral) {
+            throw new RegraDeNegocioException("O departamento Geral é o padrão e não pode ser editado nem desativado");
+        }
         this.nome = nomeValido(nome);
         this.ativo = ativo;
     }
@@ -52,4 +67,5 @@ public class Departamento {
     public String nome() { return nome; }
     public boolean ativo() { return ativo; }
     public Instant criadoEm() { return criadoEm; }
+    public boolean geral() { return geral; }
 }

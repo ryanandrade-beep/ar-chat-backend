@@ -26,7 +26,6 @@ import java.util.UUID;
  */
 @Component
 public class ResolvedorDeSessao implements HandlerMethodArgumentResolver {
-
     private static final String PREFIXO = "Bearer ";
     private static final Set<Class<?>> TIPOS = Set.of(ClienteAutenticado.class, AdministradorAutenticado.class,
             UsuarioAutenticado.class);
@@ -65,15 +64,20 @@ public class ResolvedorDeSessao implements HandlerMethodArgumentResolver {
                 Operador operador = operadores.buscarPorId(sessao.id())
                         .filter(Operador::ativo)
                         .orElseThrow(() -> new NaoAutenticadoException("Operador desativado ou removido"));
-                return new ClienteAutenticado(operador.clienteId(), operador.id());
+                return guardar(requisicao, new ClienteAutenticado(operador.clienteId(), operador.id()));
             }
             exigirPerfil(sessao, Sessao.Perfil.CLIENTE, "Rota disponível apenas para clientes");
             UUID clienteId = sessao.id();
-            return new ClienteAutenticado(clienteId, null, () -> equipe.perfilDoDono(clienteId,
-                    clientes.buscarPorId(clienteId).map(c -> c.nome()).orElse("Responsável")).id());
+            return guardar(requisicao, new ClienteAutenticado(clienteId, null, () -> equipe.perfilDoDono(clienteId,
+                    clientes.buscarPorId(clienteId).map(c -> c.nome()).orElse("Responsável")).id()));
         }
         exigirPerfil(sessao, Sessao.Perfil.ADMINISTRADOR, "Rota disponível apenas para administradores");
         return new AdministradorAutenticado(sessao.id());
+    }
+
+    private static ClienteAutenticado guardar(NativeWebRequest requisicao, ClienteAutenticado cliente) {
+        requisicao.setAttribute(AuditoriaDaRequisicao.SESSAO, cliente, NativeWebRequest.SCOPE_REQUEST);
+        return cliente;
     }
 
     private Sessao sessao(String cabecalho) {

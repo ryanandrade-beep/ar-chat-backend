@@ -3,6 +3,7 @@ package br.com.archat.aplicacao.relatorio;
 import br.com.archat.aplicacao.porta.CampanhaRepositorio;
 import br.com.archat.aplicacao.porta.MensagemRepositorio;
 import br.com.archat.dominio.campanha.Campanha;
+import br.com.archat.dominio.mensagem.Prioridade;
 import br.com.archat.dominio.mensagem.StatusMensagem;
 
 import java.math.BigDecimal;
@@ -29,7 +30,15 @@ public class RelatorioCampanhasUseCase {
     }
 
     public RelatorioCampanhas emitir(UUID clienteId, Periodo periodo) {
-        List<Campanha> doPeriodo = campanhas.listarPorPeriodo(clienteId, periodo.de(), periodo.ate());
+        return emitir(clienteId, periodo, Filtro.NENHUM);
+    }
+
+    public RelatorioCampanhas emitir(UUID clienteId, Periodo periodo, Filtro filtro) {
+        List<Campanha> doPeriodo = campanhas.listarPorPeriodo(clienteId, periodo.de(), periodo.ate()).stream()
+                .filter(c -> filtro.prioridade() == null || c.prioridade() == filtro.prioridade())
+                .filter(c -> filtro.comMidia() == null || filtro.comMidia() == (c.midia() != null))
+                .filter(c -> RelatorioAtendimentosUseCase.contem(c.nome(), filtro.busca()))
+                .toList();
         Map<UUID, Map<StatusMensagem, Long>> contagens =
                 mensagens.contarPorStatusDasCampanhas(doPeriodo.stream().map(Campanha::id).toList());
         List<DesempenhoCampanha> linhas = doPeriodo.stream()
@@ -68,6 +77,11 @@ public class RelatorioCampanhasUseCase {
     private static BigDecimal percentual(long parte, long todo) {
         return todo <= 0 ? ZERO
                 : BigDecimal.valueOf(parte).multiply(CEM).divide(BigDecimal.valueOf(todo), 2, RoundingMode.HALF_EVEN);
+    }
+
+    public record Filtro(Prioridade prioridade, Boolean comMidia, String busca) {
+
+        public static final Filtro NENHUM = new Filtro(null, null, null);
     }
 
     public record DesempenhoCampanha(Campanha campanha, long enviadas, long entregues, long lidas, long falhas,

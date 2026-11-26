@@ -5,6 +5,9 @@ import br.com.archat.aplicacao.porta.CampanhaRepositorio;
 import br.com.archat.aplicacao.porta.ClienteRepositorio;
 import br.com.archat.aplicacao.porta.ConversaRepositorio;
 import br.com.archat.aplicacao.porta.DestinatarioRepositorio;
+import br.com.archat.aplicacao.porta.EnvioDeCampanhas;
+import br.com.archat.aplicacao.porta.EtiquetasDosContatos;
+import br.com.archat.aplicacao.porta.LiberacoesDeMensagens;
 import br.com.archat.aplicacao.porta.FilaMensagens;
 import br.com.archat.aplicacao.porta.MensagemRepositorio;
 import br.com.archat.aplicacao.porta.TransacaoRepositorio;
@@ -24,10 +27,12 @@ import br.com.archat.dominio.mensagem.Prioridade;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -47,6 +52,9 @@ public class DispararCampanhaUseCase {
     private final UnidadeDeTrabalho unidadeDeTrabalho;
     private final Clock relogio;
     private final PlanoDoCliente planos;
+    private final EtiquetasDosContatos etiquetas;
+    private final EnvioDeCampanhas envios;
+    private final LiberacoesDeMensagens liberacoes;
 
     public DispararCampanhaUseCase(ClienteRepositorio clientes, DestinatarioRepositorio destinatarios,
                                    ConversaRepositorio conversas, MensagemRepositorio mensagens,
@@ -60,6 +68,19 @@ public class DispararCampanhaUseCase {
                                    TransacaoRepositorio transacoes, CampanhaRepositorio campanhas,
                                    FilaMensagens fila, UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
                                    PlanoDoCliente planos) {
+        this(clientes, destinatarios, conversas, mensagens, transacoes, campanhas, fila, unidadeDeTrabalho, relogio,
+                planos, null, null, null);
+    }
+
+    public DispararCampanhaUseCase(ClienteRepositorio clientes, DestinatarioRepositorio destinatarios,
+                                   ConversaRepositorio conversas, MensagemRepositorio mensagens,
+                                   TransacaoRepositorio transacoes, CampanhaRepositorio campanhas,
+                                   FilaMensagens fila, UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
+                                   PlanoDoCliente planos, EtiquetasDosContatos etiquetas, EnvioDeCampanhas envios,
+                                   LiberacoesDeMensagens liberacoes) {
+        this.etiquetas = etiquetas;
+        this.envios = envios;
+        this.liberacoes = liberacoes;
         this.planos = planos;
         this.clientes = clientes;
         this.destinatarios = destinatarios;
@@ -74,6 +95,7 @@ public class DispararCampanhaUseCase {
 
     public CampanhaDisparada executar(Comando comando) {
         Instant agora = relogio.instant();
+        validarProgramacao(comando, agora);
         CampanhaDisparada disparada = unidadeDeTrabalho.executar(() -> {
             Cliente cliente = clientes.buscarPorIdParaAtualizacao(comando.clienteId())
                     .orElseThrow(() -> new RecursoNaoEncontradoException("Cliente"));
@@ -91,7 +113,25 @@ public class DispararCampanhaUseCase {
                 criadas.add(registrarMensagem(cliente, campanha, destinatario, agora));
             }
             clientes.salvar(cliente);
-            return new CampanhaDisparada(campanha, criadas, cliente.disponivel());
+            boolean programada = comando.agendadaPara() != null || comando.intervaloSegundos() > 0
+                    || (comando.etiqueta() != null && !comando.etiqueta().isBlank());
+            if (programada && envios != null) {
+                envios.salvar(new EnvioDeCampanhas.Envio(campanha.id(), comando.agendadaPara(),
+                        comando.intervaloSegundos(), comando.etiqueta()));
+            }
+            Instant inicio = comando.agendadaPara() == null || comando.agendadaPara().isBefore(agora) ? agora
+                    : comando.agendadaPara();
+            Duration pausa = Duration.ofSeconds(comando.intervaloSegundos());
+            List<Mensagem> paraAgora = new ArrayList<>();
+            for (int i = 0; i < criadas.size(); i++) {
+                Instant liberarEm = inicio.plus(pausa.multipliedBy(i));
+                if (liberacoes == null || !liberarEm.isAfter(agora)) {
+                    paraAgora.add(criadas.get(i));
+                } else {
+                    liberacoes.agendar(criadas.get(i).id(), liberarEm);
+                }
+            }
+            return new CampanhaDisparada(campanha, paraAgora, cliente.disponivel());
         });
         disparada.mensagens().forEach(m -> fila.enfileirar(m.id(), m.prioridade()));
         return disparada;
@@ -99,7 +139,12 @@ public class DispararCampanhaUseCase {
 
     private List<Destinatario> publicoDaCampanha(Comando comando) {
         if (comando.todosQueAceitamOfertas()) {
-            return destinatarios.listarQueAceitamOfertas(comando.clienteId());
+            List<Destinatario> aceitam = destinatarios.listarQueAceitamOfertas(comando.clienteId());
+            if (comando.etiqueta() == null || comando.etiqueta().isBlank() || etiquetas == null) {
+                return aceitam;
+            }
+            Set<UUID> comEtiqueta = etiquetas.comEtiqueta(comando.clienteId(), comando.etiqueta());
+            return aceitam.stream().filter(d -> comEtiqueta.contains(d.id())).toList();
         }
         List<Destinatario> escolhidos = new LinkedHashSet<>(comando.destinatarioIds() == null ? List.<UUID>of()
                 : comando.destinatarioIds()).stream()
@@ -114,6 +159,22 @@ public class DispararCampanhaUseCase {
                             .formatted(semConsentimento));
         }
         return escolhidos;
+    }
+
+    private static void validarProgramacao(Comando comando, Instant agora) {
+        if (comando.intervaloSegundos() < 0 || comando.intervaloSegundos() > Comando.MAXIMO_INTERVALO_SEGUNDOS) {
+            throw new RegraDeNegocioException("A pausa entre mensagens deve ficar entre 0 e %d segundos"
+                    .formatted(Comando.MAXIMO_INTERVALO_SEGUNDOS));
+        }
+        if (comando.agendadaPara() != null) {
+            if (comando.agendadaPara().isBefore(agora.minusSeconds(60))) {
+                throw new RegraDeNegocioException("O horário agendado já passou");
+            }
+            if (comando.agendadaPara().isAfter(agora.plus(Duration.ofDays(Comando.MAXIMO_DIAS_AGENDADOS)))) {
+                throw new RegraDeNegocioException("A campanha só pode ser agendada para os próximos %d dias"
+                        .formatted(Comando.MAXIMO_DIAS_AGENDADOS));
+            }
+        }
     }
 
     private static void garantirSaldoParaTudo(Cliente cliente, Campanha campanha) {
@@ -140,7 +201,16 @@ public class DispararCampanhaUseCase {
     }
 
     public record Comando(UUID clienteId, String nome, String conteudo, Midia midia, Prioridade prioridade,
-                          List<UUID> destinatarioIds, boolean todosQueAceitamOfertas) {
+                          List<UUID> destinatarioIds, boolean todosQueAceitamOfertas, Instant agendadaPara,
+                          int intervaloSegundos, String etiqueta) {
+
+        public static final int MAXIMO_INTERVALO_SEGUNDOS = 3600;
+        public static final int MAXIMO_DIAS_AGENDADOS = 90;
+
+        public Comando(UUID clienteId, String nome, String conteudo, Midia midia, Prioridade prioridade,
+                       List<UUID> destinatarioIds, boolean todosQueAceitamOfertas) {
+            this(clienteId, nome, conteudo, midia, prioridade, destinatarioIds, todosQueAceitamOfertas, null, 0, null);
+        }
 
         public Comando(UUID clienteId, String nome, String conteudo, Prioridade prioridade,
                        List<UUID> destinatarioIds, boolean todosQueAceitamOfertas) {

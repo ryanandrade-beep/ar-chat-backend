@@ -71,14 +71,31 @@ public final class MensagemDtos {
     public record MessageResponse(UUID id, UUID conversationId, UUID campaignId, String content, MediaResponse media,
                                   ContactResponse contact, UUID operatorId, boolean internal,
                                   SentBy sentBy, boolean automatic, Instant timestamp,
-                                  String priority, String status, BigDecimal cost, int attempts, Instant updatedAt) {
+                                  String priority, String status, BigDecimal cost, int attempts, Instant updatedAt, Order order) {
+
+        public record OrderItem(String productId, String name, int quantity, BigDecimal unitPrice, String image) {
+        }
+
+        /** Pedido montado no carrinho do catálogo, para o chat mostrar o cartão "Seu pedido". */
+        public record Order(java.util.List<OrderItem> items, BigDecimal total) {
+            public static Order de(java.util.List<br.com.archat.dominio.entrega.ItemDeEntrega> itens) {
+                if (itens == null || itens.isEmpty()) return null;
+                return new Order(itens.stream().map(i -> new OrderItem(i.produtoId(), i.nome(), i.quantidade(), i.valorUnitario(), i.imagem())).toList(),
+                        itens.stream().map(br.com.archat.dominio.entrega.ItemDeEntrega::subtotal).reduce(BigDecimal.ZERO, BigDecimal::add));
+            }
+        }
+
+        public MessageResponse comPedido(Order pedido) {
+            return new MessageResponse(id, conversationId, campaignId, content, media, contact, operatorId, internal, sentBy,
+                    automatic, timestamp, priority, status, cost, attempts, updatedAt, pedido);
+        }
 
         public static MessageResponse de(Mensagem m) {
             return new MessageResponse(m.id(), m.conversaId(), m.campanhaId(), m.conteudo(), MediaResponse.de(m.midia()),
                     ContactResponse.de(m.contato()), m.operadorId(), m.interna(),
                     new SentBy(m.remetente() == Remetente.CLIENTE ? "client" : "user"), m.automatica(), m.criadaEm(),
                     ApiEnums.prioridade(m.prioridade()), ApiEnums.status(m.status()), m.custo(), m.tentativas(),
-                    m.atualizadaEm());
+                    m.atualizadaEm(), null);
         }
     }
 

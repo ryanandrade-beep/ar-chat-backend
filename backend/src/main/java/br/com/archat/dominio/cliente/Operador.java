@@ -12,10 +12,13 @@ import java.util.UUID;
  */
 public class Operador {
 
+    private static final java.util.regex.Pattern NOME =
+            java.util.regex.Pattern.compile("^\\p{L}[\\p{L}\\p{M}0-9 '.\\-]*$");
+
     private final UUID id;
     private final UUID clienteId;
     private String nome;
-    private final String email;
+    private String email;
     private String senhaHash;
     private boolean ativo;
     private final Instant criadoEm;
@@ -55,16 +58,24 @@ public class Operador {
         return operador;
     }
 
-    private static String nomeValido(String nome) {
-        if (nome == null || nome.isBlank() || nome.strip().length() > 120) {
-            throw new RegraDeNegocioException("Informe o nome do operador (até 120 caracteres)");
+    public static String nomeValido(String nome) {
+        String limpo = nome == null ? "" : nome.strip().replaceAll("\\s+", " ");
+        if (limpo.length() < 2 || limpo.length() > 120) {
+            throw new RegraDeNegocioException("Informe o nome do operador (de 2 a 120 caracteres)");
         }
-        return nome.strip();
+        if (!NOME.matcher(limpo).matches()) {
+            throw new RegraDeNegocioException("O nome do operador só pode ter letras, números, espaço, apóstrofo, ponto e hífen");
+        }
+        return limpo;
     }
 
     public void alterar(String novoNome, boolean ativo) {
         this.nome = nomeValido(novoNome);
         this.ativo = ativo;
+    }
+
+    public void trocarEmail(String novoEmail) {
+        this.email = Objects.requireNonNull(novoEmail);
     }
 
     public void trocarSenha(String novaSenhaHash) {

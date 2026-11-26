@@ -18,7 +18,8 @@ public class ContaDeAcesso {
     public static final int TAMANHO_MINIMO_SENHA = 8;
     public static final Duration VALIDADE_CODIGO = Duration.ofMinutes(15);
     public static final int MAXIMO_TENTATIVAS_CODIGO = 5;
-    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    private static final Pattern EMAIL = Pattern.compile(
+            "^[a-z0-9]+(?:[._%+-][a-z0-9]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z]{2,}$");
 
     private final UUID clienteId;
     private final String email;

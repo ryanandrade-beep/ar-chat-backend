@@ -24,7 +24,7 @@ public record ArChatPropriedades(Token token, AdministradorInicial administrador
     public record EnvioSimulado(Duration atrasoMinimo, Duration atrasoMaximo, double taxaFalha) {
     }
 
-    public record Webhook(String segredo) {
+    public record Webhook(String segredo, String urlPublica) {
     }
 
     public record ZApi(String urlBase, String instancia, String token, String clientToken, Duration timeout) {

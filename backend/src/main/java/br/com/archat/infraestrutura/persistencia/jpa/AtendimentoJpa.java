@@ -14,6 +14,8 @@ public interface AtendimentoJpa extends JpaRepository<AtendimentoEntity, UUID> {
     Optional<AtendimentoEntity> findFirstByConversaIdAndStatusNotOrderByAbertoEmDesc(UUID conversaId,
                                                                                     StatusAtendimento status);
 
+    Optional<AtendimentoEntity> findFirstByConversaIdOrderByAbertoEmDesc(UUID conversaId);
+
     List<AtendimentoEntity> findByClienteIdAndAbertoEmGreaterThanEqualAndAbertoEmLessThan(UUID clienteId, Instant de,
                                                                                          Instant ate);
 

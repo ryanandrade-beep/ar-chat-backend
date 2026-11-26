@@ -14,25 +14,32 @@ public final class ConversaDtos {
                                        String recipientType, String status, String lastMessageContent,
                                        Instant lastMessageTime, int unreadCount, UUID operatorId,
                                        String operatorName, UUID departmentId, String departmentName,
-                                       boolean waitingIvr, java.util.List<Participant> participants) {
+                                       boolean waitingIvr, java.util.List<Participant> participants, Attendance attendance) {
 
         public static ConversationResponse de(ResumoConversa resumo) {
-            return de(resumo, java.util.Map.of(), java.util.Map.of(), java.util.List.of());
+            return de(resumo, java.util.Map.of(), java.util.Map.of(), java.util.List.of(), null);
         }
 
         public static ConversationResponse de(ResumoConversa resumo, java.util.Map<UUID, String> nomesDosOperadores,
                                               java.util.Map<UUID, String> nomesDosDepartamentos,
-                                              java.util.List<Participant> participantes) {
+                                              java.util.List<Participant> participantes, Attendance ciclo) {
             var c = resumo.conversa();
             var d = resumo.destinatario();
             return new ConversationResponse(c.id(), d.id(), d.nome(), d.telefone(), d.grupo() ? "group" : "contact",
                     ApiEnums.atendimento(c.statusAtendimento()), c.ultimaMensagem(), c.dataUltimaMensagem(), c.naoLidas(),
                     c.operadorId(), c.operadorId() == null ? null : nomesDosOperadores.get(c.operadorId()),
                     c.departamentoId(), c.departamentoId() == null ? null : nomesDosDepartamentos.get(c.departamentoId()),
-                    c.aguardandoUra(), participantes);
+                    c.aguardandoUra(), participantes, ciclo);
         }
     }
 
     public record Participant(UUID id, String name) {
+    }
+
+    public record Attendance(Instant openedAt, Instant startedAt, Instant firstResponseAt, Instant finishedAt) {
+
+        public static Attendance de(br.com.archat.dominio.atendimento.Atendimento a) {
+            return a == null ? null : new Attendance(a.abertoEm(), a.iniciadoEm(), a.primeiraRespostaEm(), a.finalizadoEm());
+        }
     }
 }

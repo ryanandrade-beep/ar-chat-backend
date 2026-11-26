@@ -24,13 +24,24 @@ class AtendimentoRepositorioJpa implements AtendimentoRepositorio {
     @Override
     public void salvar(Atendimento a) {
         jpa.save(new AtendimentoEntity(a.id(), a.conversaId(), a.clienteId(), a.origem(), a.status(), a.abertoEm(),
-                a.primeiraRespostaEm(), a.finalizadoEm(), a.mensagensEnviadas(), a.mensagensRecebidas()));
+                a.iniciadoEm(), a.primeiraRespostaEm(), a.finalizadoEm(), a.mensagensEnviadas(), a.mensagensRecebidas(),
+                a.observacaoDeEncerramento()));
     }
 
     @Override
     public Optional<Atendimento> buscarAbertoDaConversa(UUID conversaId) {
         return jpa.findFirstByConversaIdAndStatusNotOrderByAbertoEmDesc(conversaId, StatusAtendimento.FINALIZADO)
                 .map(AtendimentoRepositorioJpa::paraDominio);
+    }
+
+    @Override
+    public Optional<Atendimento> buscarPorId(UUID atendimentoId) {
+        return jpa.findById(atendimentoId).map(AtendimentoRepositorioJpa::paraDominio);
+    }
+
+    @Override
+    public Optional<Atendimento> buscarUltimoDaConversa(UUID conversaId) {
+        return jpa.findFirstByConversaIdOrderByAbertoEmDesc(conversaId).map(AtendimentoRepositorioJpa::paraDominio);
     }
 
     @Override
@@ -51,7 +62,7 @@ class AtendimentoRepositorioJpa implements AtendimentoRepositorio {
 
     private static Atendimento paraDominio(AtendimentoEntity e) {
         return Atendimento.reconstituir(e.getId(), e.getConversaId(), e.getClienteId(), e.getOrigem(), e.getStatus(),
-                e.getAbertoEm(), e.getPrimeiraRespostaEm(), e.getFinalizadoEm(), e.getMensagensEnviadas(),
-                e.getMensagensRecebidas());
+                e.getAbertoEm(), e.getIniciadoEm(), e.getPrimeiraRespostaEm(), e.getFinalizadoEm(), e.getMensagensEnviadas(),
+                e.getMensagensRecebidas(), e.getObservacaoEncerramento());
     }
 }

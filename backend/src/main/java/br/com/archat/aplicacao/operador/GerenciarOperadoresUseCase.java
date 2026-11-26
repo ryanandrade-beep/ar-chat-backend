@@ -16,9 +16,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Operadores da workspace, gerenciados pelo dono: cadastrar (com login próprio), alterar nome, ativar ou
- * desativar e redefinir a senha. O e-mail de login é único na plataforma (não pode repetir o de outro
- * operador nem o de um dono de workspace).
+ * Operadores da workspace, gerenciados pelo dono: cadastrar (com login próprio), alterar nome (único na empresa) e e-mail, ativar ou
+ * desativar e redefinir a senha. O e-mail de login é único dentro da empresa: pode repetir o de operadores
+ * de outras empresas, mas não o de outro operador nem o do responsável da própria empresa.
  */
 public class GerenciarOperadoresUseCase {
 
@@ -67,11 +67,13 @@ public class GerenciarOperadoresUseCase {
     public Operador cadastrar(UUID clienteId, String nome, String email, String senha) {
         ContaDeAcesso.validarSenha(senha);
         String normalizado = ContaDeAcesso.normalizarEmail(email);
-        Operador novo = Operador.novo(clienteId, nome, normalizado, codificador.codificar(senha), relogio.instant());
+        String nomeLimpo = Operador.nomeValido(nome);
+        Operador novo = Operador.novo(clienteId, nomeLimpo, normalizado, codificador.codificar(senha), relogio.instant());
         return unidadeDeTrabalho.executar(() -> {
-            if (operadores.existeComEmail(normalizado) || contas.existeComEmail(normalizado)) {
-                throw new RegraDeNegocioException("Este e-mail já é usado por outro login");
+            if (emailEmUsoNaEmpresa(clienteId, normalizado)) {
+                throw new RegraDeNegocioException("Este e-mail já é usado por outro login desta empresa");
             }
+            exigirNomeLivre(clienteId, nomeLimpo, null);
             garantirVaga(clienteId);
             operadores.salvar(novo);
             return novo;
@@ -79,15 +81,40 @@ public class GerenciarOperadoresUseCase {
     }
 
     public Operador alterar(UUID clienteId, UUID operadorId, String nome, boolean ativo) {
+        return alterar(clienteId, operadorId, nome, null, ativo);
+    }
+
+    public Operador alterar(UUID clienteId, UUID operadorId, String nome, String email, boolean ativo) {
+        String novoEmail = email == null || email.isBlank() ? null : ContaDeAcesso.normalizarEmail(email);
         return unidadeDeTrabalho.executar(() -> {
             Operador operador = buscar(clienteId, operadorId);
+            if (novoEmail != null && !novoEmail.equals(operador.email())) {
+                if (emailEmUsoNaEmpresa(clienteId, novoEmail)) {
+                    throw new RegraDeNegocioException("Este e-mail já é usado por outro login desta empresa");
+                }
+                operador.trocarEmail(novoEmail);
+            }
             if (ativo && !operador.ativo()) {
                 garantirVaga(clienteId);
             }
+            exigirNomeLivre(clienteId, Operador.nomeValido(nome), operadorId);
             operador.alterar(nome, ativo);
             operadores.salvar(operador);
             return operador;
         });
+    }
+
+    private void exigirNomeLivre(UUID clienteId, String nome, UUID operadorId) {
+        boolean repetido = operadores.listarPorCliente(clienteId).stream()
+                .anyMatch(o -> !o.id().equals(operadorId) && o.nome().equalsIgnoreCase(nome));
+        if (repetido) {
+            throw new RegraDeNegocioException("Já existe um operador com este nome nesta empresa");
+        }
+    }
+
+    private boolean emailEmUsoNaEmpresa(UUID clienteId, String email) {
+        return operadores.existeComEmailNaEmpresa(clienteId, email)
+                || contas.buscarPorEmail(email).filter(c -> c.clienteId().equals(clienteId)).isPresent();
     }
 
     public java.util.Optional<Integer> limite(UUID clienteId) {

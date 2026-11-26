@@ -28,10 +28,14 @@ public class AtendimentoEntity {
     private StatusAtendimento status;
     @Column(name = "aberto_em")
     private Instant abertoEm;
+    @Column(name = "iniciado_em")
+    private Instant iniciadoEm;
     @Column(name = "primeira_resposta_em")
     private Instant primeiraRespostaEm;
     @Column(name = "finalizado_em")
     private Instant finalizadoEm;
+    @Column(name = "observacao_encerramento")
+    private String observacaoEncerramento;
     @Column(name = "mensagens_enviadas")
     private int mensagensEnviadas;
     @Column(name = "mensagens_recebidas")
@@ -41,14 +45,17 @@ public class AtendimentoEntity {
     }
 
     public AtendimentoEntity(UUID id, UUID conversaId, UUID clienteId, OrigemAtendimento origem,
-                             StatusAtendimento status, Instant abertoEm, Instant primeiraRespostaEm,
-                             Instant finalizadoEm, int mensagensEnviadas, int mensagensRecebidas) {
+                             StatusAtendimento status, Instant abertoEm, Instant iniciadoEm,
+                             Instant primeiraRespostaEm, Instant finalizadoEm, int mensagensEnviadas,
+                             int mensagensRecebidas, String observacaoEncerramento) {
+        this.observacaoEncerramento = observacaoEncerramento;
         this.id = id;
         this.conversaId = conversaId;
         this.clienteId = clienteId;
         this.origem = origem;
         this.status = status;
         this.abertoEm = abertoEm;
+        this.iniciadoEm = iniciadoEm;
         this.primeiraRespostaEm = primeiraRespostaEm;
         this.finalizadoEm = finalizadoEm;
         this.mensagensEnviadas = mensagensEnviadas;
@@ -61,8 +68,10 @@ public class AtendimentoEntity {
     public OrigemAtendimento getOrigem() { return origem; }
     public StatusAtendimento getStatus() { return status; }
     public Instant getAbertoEm() { return abertoEm; }
+    public Instant getIniciadoEm() { return iniciadoEm; }
     public Instant getPrimeiraRespostaEm() { return primeiraRespostaEm; }
     public Instant getFinalizadoEm() { return finalizadoEm; }
+    public String getObservacaoEncerramento() { return observacaoEncerramento; }
     public int getMensagensEnviadas() { return mensagensEnviadas; }
     public int getMensagensRecebidas() { return mensagensRecebidas; }
 }

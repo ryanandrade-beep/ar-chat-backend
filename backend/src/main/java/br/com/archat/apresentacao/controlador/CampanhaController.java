@@ -2,11 +2,13 @@ package br.com.archat.apresentacao.controlador;
 
 import br.com.archat.aplicacao.campanha.ConsultarCampanhasUseCase;
 import br.com.archat.aplicacao.campanha.DispararCampanhaUseCase;
+import br.com.archat.aplicacao.destinatario.GerenciarEtiquetasUseCase;
 import br.com.archat.apresentacao.dto.ApiEnums;
 import br.com.archat.apresentacao.dto.MensagemDtos.MediaRequest;
 import br.com.archat.apresentacao.dto.CampanhaDtos.CampaignCreatedResponse;
 import br.com.archat.apresentacao.dto.CampanhaDtos.CampaignResponse;
 import br.com.archat.apresentacao.dto.CampanhaDtos.CreateCampaignRequest;
+import br.com.archat.apresentacao.seguranca.AuditoriaDaRequisicao;
 import br.com.archat.apresentacao.seguranca.ClienteAutenticado;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,9 +44,13 @@ class CampanhaController {
     CampaignCreatedResponse disparar(ClienteAutenticado cliente, @Valid @RequestBody CreateCampaignRequest r) {
         cliente.exigirGestor();
         ApiEnums.exigirCanalDisponivel(r.channel());
-        return CampaignCreatedResponse.de(disparar.executar(new DispararCampanhaUseCase.Comando(cliente.id(), r.name(),
+        var disparada = disparar.executar(new DispararCampanhaUseCase.Comando(cliente.id(), r.name(),
                 r.content(), MediaRequest.paraDominio(r.media()), ApiEnums.prioridade(r.priority()), r.recipientIds(),
-                r.todosQueAceitam())));
+                r.todosQueAceitam(), r.scheduledAt(), r.intervalSeconds() == null ? 0 : r.intervalSeconds(),
+                r.tag() == null || r.tag().isBlank() ? null : GerenciarEtiquetasUseCase.normalizar(r.tag())));
+        AuditoriaDaRequisicao.recurso("Campanha " + disparada.campanha().nome());
+        AuditoriaDaRequisicao.detalhe(disparada.campanha().totalDestinatarios() + " destinatário(s)");
+        return CampaignCreatedResponse.de(disparada);
     }
 
     @GetMapping

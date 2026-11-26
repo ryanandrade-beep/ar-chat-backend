@@ -45,6 +45,18 @@ Além do escopo principal, o sistema já tem:
 | **Painel do gestor** | Atendimentos por status, média da primeira resposta, atendimentos por dia e por operador e contatos mais frequentes |
 | **WhatsApp por empresa** | Cada empresa usa a sua instância da Z-API; só o administrador da empresa conecta o número |
 | **Arquivos, contato e áudio** | Envio de arquivos do computador, de contatos e de áudio gravado pelo microfone |
+| **Tema claro e escuro** | Alternância no painel e no chat |
+| **Contatos com etiquetas** | Etiquetas coloridas com autocomplete; filtro por etiqueta no chat e nas campanhas |
+| **Campanhas programadas** | Data de início, intervalo entre envios, filtro por etiqueta e por data, métricas de entrega e falha |
+| **Encerramento do atendimento** | Encerrar no departamento ou enviar ao departamento **Geral** (padrão, não editável), com observação; o Geral recebe tudo o que não escolheu departamento na URA |
+| **Operadores por departamento** | Cada operador atende os departamentos vinculados; e-mail único por empresa e validação do nome |
+| **Exportação** | Dashboard e relatórios exportam **CSV, Excel e PDF** com filtros e colunas à escolha: atendimentos, campanhas, **histórico de pagamentos** e contatos |
+| **Histórico do ticket** | Cada atendimento finalizado tem a conversa completa, exportável |
+| **Entregas** | O operador gera a entrega ao encerrar (endereço, produtos do catálogo ou texto, valor e pagamento); o responsável confirma **saiu** e **entregue**, cancela, edita e acompanha tempo médio e em trânsito. O cliente é avisado no WhatsApp (mensagens editáveis e chave Pix) |
+| **Catálogo do WhatsApp Business** | Lista os produtos do catálogo da instância, recebe o carrinho do cliente como **cartão "Seu pedido"** no chat (fotos, preço e quantidade) e vira entrega; envia a cobrança com Pix e atualiza o status nativo do pedido (`shipped`/`completed`), com texto como alternativa |
+| **Integrações (webhook de saída)** | O responsável cadastra a URL do CRM e escolhe os eventos (`message.received`, `attendance.started`, `attendance.finished`, `delivery.dispatched`, `delivery.delivered`). Formato próprio do A&R Chat (sem nada da Z-API), assinatura HMAC-SHA256, novas tentativas e histórico com reenvio |
+| **Auditoria (suporte)** | O backoffice vê quem fez o quê e quando em cada empresa (login, operadores, atendimentos, entregas, campanhas, integração), com filtro por empresa (nome ou ID), ação, período e busca, e exporta em CSV |
+| **Histórico de pagamentos** | Na tela Assinatura: recargas de crédito e mensalidades dos últimos 12 meses, exportáveis |
 
 Nenhuma movimentação depende da Z-API: ela é só o canal que entrega as mensagens e avisa respostas, entregas e leituras.
 
@@ -60,6 +72,10 @@ encarte de ofertas em imagem).
 | Fila de envio (mídia) | `POST /send-image`, `/send-document/{extensão}`, `/send-audio`, `/send-video` | Enviar mídia (link ou base64) |
 | Fila de envio (contato) | `POST /send-contact` | Enviar um contato |
 | `GET /recipients/whatsapp-contacts` | `GET /contacts` | Importar contatos da agenda |
+| `GET /catalog/products` | `POST /catalogs` | Produtos do catálogo (preços vêm em milésimos) |
+| `POST /deliveries/{id}/charge` | `POST /send-order` | Cobrança com Pix e cartão |
+| `POST /deliveries/{id}/dispatch` e `/deliver` | `POST /order-status-update` | Status nativo do pedido (`shipped`, `completed`) |
+| Inicialização do backend | `PUT /update-webhook-received` e `/update-webhook-message-status` | Aponta os webhooks para `ARCHAT_URL_PUBLICA` |
 | `GET /whatsapp/status` | `GET /status` | Situação da conexão |
 | `GET /whatsapp/qr-code` | `GET /qr-code/image` | Conectar por QR Code |
 | `GET /whatsapp/phone-code/{telefone}` | `GET /phone-code/{phone}` | Conectar por código no telefone |
@@ -68,6 +84,7 @@ encarte de ofertas em imagem).
 | `POST /conversations/{id}/read` | `POST /read-message` | Marcar como lida no WhatsApp |
 | `POST /webhooks/zapi/{segredo}/received` | Webhook "Ao receber" | Mensagens recebidas (texto e mídia) |
 | `POST /webhooks/zapi/{segredo}/status` | Webhook "Status da mensagem" | Entregue / lida |
+| Webhook "Ao receber" (`order`, `reviewOrder`, `reviewAndPay`) | Pedido do carrinho do catálogo e referências do pedido nativo |
 
 ## Como executar
 
@@ -94,6 +111,15 @@ npm run dev      # http://localhost:5173 — crie uma conta em "Criar conta" ou 
 - Banco no DBeaver: `localhost:5433`, base `archat`, usuário `archat`, senha `archat`
 - Postman: importe os dois arquivos de `docs/05-postman` e rode a collection (login automático)
 
+Scripts em `scripts/` (cada um sobe uma parte, para rodar backend e frontend em abas separadas do terminal):
+
+```bash
+scripts/backend.sh    # backend com as variáveis do .env (porta 8081)
+scripts/frontend.sh   # painel em http://localhost:5173
+scripts/tunel.sh      # túnel temporário (cloudflared); mostra a ARCHAT_URL_PUBLICA a usar
+NGROK_DOMINIO=seu-nome.ngrok-free.dev scripts/tunel-fixo.sh   # túnel com endereço fixo (ngrok)
+```
+
 ### Envio real pelo WhatsApp (Z-API)
 
 No `.env` da raiz: `ARCHAT_ENVIO_PROVEDOR=zapi`, `ARCHAT_ZAPI_URL`, `ARCHAT_ZAPI_INSTANCIA`, `ARCHAT_ZAPI_TOKEN`,
@@ -103,7 +129,39 @@ Webhooks (a Z-API exige HTTPS — em desenvolvimento, use um túnel como o `clou
 - Ao receber: `https://SEU-ENDERECO/webhooks/zapi/<ARCHAT_WEBHOOK_SEGREDO>/received`
 - Status da mensagem: `https://SEU-ENDERECO/webhooks/zapi/<ARCHAT_WEBHOOK_SEGREDO>/status`
 
+Com `ARCHAT_URL_PUBLICA=https://SEU-ENDERECO` (no `.env`), o backend aponta os webhooks de todas as instâncias para esse
+endereço **a cada partida**, sem mexer no painel da Z-API. Para o endereço não mudar, use um túnel fixo (`scripts/tunel-fixo.sh`).
+
 Sem webhook, dá para demonstrar o atendimento com `POST /conversations/{id}/simulate-reply`.
+
+### Webhook de saída (integração com CRM)
+
+Em **Integrações**, o responsável informa uma URL `https` pública e marca os eventos. Cada aviso é um `POST` em JSON:
+
+```json
+{ "id": "…", "event": "attendance.finished", "occurredAt": "2026-11-25T20:12:47Z",
+  "data": { "attendanceId": "…", "conversationId": "…", "contact": { "name": "…", "phone": "…" },
+            "operator": { "id": "…", "name": "…" }, "department": "Geral", "closingNote": "…" } }
+```
+
+Cabeçalhos: `X-ArChat-Event`, `X-ArChat-Delivery`, `X-ArChat-Timestamp` e `X-ArChat-Signature` =
+`sha256=` + HMAC-SHA256 de `"{timestamp}.{corpo}"` com o segredo da integração. Se o CRM falhar, há novas tentativas
+(30 s, 2 min e 10 min); depois o envio fica como *falhou* e pode ser reenviado pelo painel. URLs internas
+(`localhost`, IPs privados) são recusadas.
+
+### Dados fictícios para demonstração
+
+```bash
+C=$(docker ps -qf publish=5433 | head -1)
+docker exec -i $C psql -U archat -d archat < scripts/dados-demo.sql                         # contatos, atendimentos e campanhas
+docker exec -i $C psql -U archat -d archat < scripts/dados-demo-entregas.sql                # entregas, pedidos do catálogo e integração
+docker exec -i $C psql -U archat -d archat < scripts/dados-demo-auditoria.sql               # auditoria do Cliente Teste QR
+docker exec -i $C psql -U archat -d archat < scripts/dados-demo-auditoria-outras-empresas.sql
+docker exec -i $C psql -U archat -d archat < scripts/limpar-dados-demo.sql                  # remove o primeiro grupo
+docker exec -i $C psql -U archat -d archat < scripts/limpar-dados-demo-entregas.sql         # remove entregas, integração e auditoria de exemplo
+```
+
+Os scripts de exemplo foram escritos para o banco desta máquina (ids da empresa e dos operadores no próprio arquivo).
 
 ### Testes
 

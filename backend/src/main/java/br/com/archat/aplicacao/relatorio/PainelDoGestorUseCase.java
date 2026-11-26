@@ -41,18 +41,27 @@ public class PainelDoGestorUseCase {
     }
 
     public Painel emitir(UUID clienteId, Periodo periodo, UUID operadorId) {
+        return emitir(clienteId, periodo, operadorId, null);
+    }
+
+    public Painel emitir(UUID clienteId, Periodo periodo, UUID operadorId, UUID departamentoId) {
         Map<UUID, Conversa> conversasPorId = conversas.listarPorCliente(clienteId).stream()
                 .collect(Collectors.toMap(Conversa::id, Function.identity()));
         List<Atendimento> doPeriodo = atendimentos.listarAbertosNoPeriodo(clienteId, periodo.de(), periodo.ate()).stream()
                 .filter(a -> operadorId == null || operadorId.equals(responsavel(conversasPorId, a)))
+                .filter(a -> departamentoId == null || departamentoId.equals(departamento(conversasPorId, a)))
                 .toList();
         List<Conversa> abertasAgora = conversasPorId.values().stream()
                 .filter(c -> c.statusAtendimento() != StatusAtendimento.FINALIZADO)
                 .filter(c -> operadorId == null || operadorId.equals(c.operadorId()))
+                .filter(c -> departamentoId == null || departamentoId.equals(c.departamentoId()))
                 .toList();
 
         long finalizados = doPeriodo.stream().filter(a -> a.status() == StatusAtendimento.FINALIZADO).count();
         Long mediaPrimeiraResposta = media(doPeriodo.stream().map(Atendimento::tempoAtePrimeiraResposta)
+                .flatMap(Optional::stream).toList());
+        Long mediaEspera = media(doPeriodo.stream().map(Atendimento::tempoDeEspera).flatMap(Optional::stream).toList());
+        Long mediaAtendimento = media(doPeriodo.stream().map(Atendimento::tempoDeAtendimento)
                 .flatMap(Optional::stream).toList());
 
         Map<LocalDate, Long> porDia = new TreeMap<>(doPeriodo.stream()
@@ -60,6 +69,9 @@ public class PainelDoGestorUseCase {
 
         Map<UUID, Long> porOperador = doPeriodo.stream().collect(Collectors.groupingBy(
                 a -> Optional.ofNullable(responsavel(conversasPorId, a)).orElse(SEM_RESPONSAVEL), Collectors.counting()));
+
+        Map<UUID, Long> porDepartamento = doPeriodo.stream().collect(Collectors.groupingBy(
+                a -> Optional.ofNullable(departamento(conversasPorId, a)).orElse(SEM_RESPONSAVEL), Collectors.counting()));
 
         Map<UUID, Long> porConversa = doPeriodo.stream()
                 .collect(Collectors.groupingBy(Atendimento::conversaId, Collectors.counting()));
@@ -77,7 +89,7 @@ public class PainelDoGestorUseCase {
 
         return new Painel(doPeriodo.size(), abertasAgora.size(),
                 abertasAgora.stream().filter(c -> c.statusAtendimento() == StatusAtendimento.AGUARDANDO).count(),
-                finalizados, mediaPrimeiraResposta, porDia, porOperador, top);
+                finalizados, mediaPrimeiraResposta, mediaEspera, mediaAtendimento, porDia, porOperador, top, porDepartamento);
     }
 
     public static final UUID SEM_RESPONSAVEL = new UUID(0, 0);
@@ -85,6 +97,11 @@ public class PainelDoGestorUseCase {
     private static UUID responsavel(Map<UUID, Conversa> conversas, Atendimento a) {
         Conversa c = conversas.get(a.conversaId());
         return c == null ? null : c.operadorId();
+    }
+
+    private static UUID departamento(Map<UUID, Conversa> conversas, Atendimento a) {
+        Conversa c = conversas.get(a.conversaId());
+        return c == null ? null : c.departamentoId();
     }
 
     private static Long media(List<Duration> duracoes) {
@@ -96,7 +113,8 @@ public class PainelDoGestorUseCase {
     }
 
     public record Painel(long atendimentos, long abertosAgora, long aguardandoAgora, long finalizados,
-                         Long mediaPrimeiraRespostaSegundos, Map<LocalDate, Long> porDia, Map<UUID, Long> porOperador,
-                         List<ContatoFrequente> topContatos) {
+                         Long mediaPrimeiraRespostaSegundos, Long mediaEsperaSegundos,
+                         Long mediaAtendimentoSegundos, Map<LocalDate, Long> porDia, Map<UUID, Long> porOperador,
+                         List<ContatoFrequente> topContatos, Map<UUID, Long> porDepartamento) {
     }
 }

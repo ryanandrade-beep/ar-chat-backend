@@ -1,6 +1,8 @@
 package br.com.archat.apresentacao.controlador;
 
 import br.com.archat.aplicacao.departamento.GerenciarDepartamentosUseCase;
+import br.com.archat.aplicacao.operador.GerenciarDepartamentosDoOperadorUseCase;
+import br.com.archat.apresentacao.seguranca.AuditoriaDaRequisicao;
 import br.com.archat.apresentacao.seguranca.ClienteAutenticado;
 import br.com.archat.dominio.departamento.ConfiguracaoUra;
 import br.com.archat.dominio.departamento.Departamento;
@@ -21,6 +23,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,15 +34,22 @@ import java.util.UUID;
 class DepartamentoController {
 
     private final GerenciarDepartamentosUseCase departamentos;
+    private final GerenciarDepartamentosDoOperadorUseCase operadoresDoDepartamento;
 
-    DepartamentoController(GerenciarDepartamentosUseCase departamentos) {
+    DepartamentoController(GerenciarDepartamentosUseCase departamentos,
+                           GerenciarDepartamentosDoOperadorUseCase operadoresDoDepartamento) {
+        this.operadoresDoDepartamento = operadoresDoDepartamento;
         this.departamentos = departamentos;
     }
 
     @GetMapping("/departments")
     @Operation(summary = "Departamentos da workspace (dono e operadores)")
     List<DepartmentResponse> listar(ClienteAutenticado cliente) {
-        return departamentos.listar(cliente.id()).stream().map(DepartmentResponse::de).toList();
+        Map<UUID, List<UUID>> porDepartamento = new HashMap<>();
+        operadoresDoDepartamento.doCliente(cliente.id()).forEach((operador, setores) ->
+                setores.forEach(setor -> porDepartamento.computeIfAbsent(setor, k -> new ArrayList<>()).add(operador)));
+        return departamentos.listar(cliente.id()).stream()
+                .map(d -> DepartmentResponse.de(d, porDepartamento.getOrDefault(d.id(), List.of()))).toList();
     }
 
     @PostMapping("/departments")
@@ -45,14 +57,27 @@ class DepartamentoController {
     @Operation(summary = "Cria um departamento (dono)")
     DepartmentResponse criar(ClienteAutenticado cliente, @Valid @RequestBody DepartmentRequest r) {
         cliente.exigirGestor();
-        return DepartmentResponse.de(departamentos.criar(cliente.id(), r.name()));
+        var criado = departamentos.criar(cliente.id(), r.name());
+        AuditoriaDaRequisicao.recurso("Departamento " + criado.nome());
+        return DepartmentResponse.de(criado, List.of());
     }
 
     @PutMapping("/departments/{id}")
     @Operation(summary = "Renomeia, ativa ou desativa um departamento (dono)")
     DepartmentResponse alterar(ClienteAutenticado cliente, @PathVariable UUID id, @Valid @RequestBody DepartmentRequest r) {
         cliente.exigirGestor();
-        return DepartmentResponse.de(departamentos.alterar(cliente.id(), id, r.name(), r.active() == null || r.active()));
+        var alterado = departamentos.alterar(cliente.id(), id, r.name(), r.active() == null || r.active());
+        return DepartmentResponse.de(alterado, operadoresDoDepartamento.doCliente(cliente.id()).entrySet().stream()
+                .filter(e -> e.getValue().contains(id)).map(Map.Entry::getKey).toList());
+    }
+
+    @PutMapping("/departments/{id}/operators")
+    @Operation(summary = "Define quais operadores atuam no departamento, inclusive no Geral (dono)")
+    DepartmentResponse definirOperadores(ClienteAutenticado cliente, @PathVariable UUID id,
+                                         @RequestBody DepartmentOperatorsRequest r) {
+        cliente.exigirGestor();
+        List<UUID> ids = operadoresDoDepartamento.definirOperadores(cliente.id(), id, r.operatorIds());
+        return DepartmentResponse.de(departamentos.buscar(cliente.id(), id), ids);
     }
 
     @GetMapping("/ivr")
@@ -73,10 +98,13 @@ class DepartamentoController {
     record DepartmentRequest(@NotBlank @Size(max = 60) String name, Boolean active) {
     }
 
-    record DepartmentResponse(UUID id, String name, boolean active) {
+    record DepartmentOperatorsRequest(List<UUID> operatorIds) {
+    }
 
-        static DepartmentResponse de(Departamento d) {
-            return new DepartmentResponse(d.id(), d.nome(), d.ativo());
+    record DepartmentResponse(UUID id, String name, boolean active, boolean general, List<UUID> operatorIds) {
+
+        static DepartmentResponse de(Departamento d, List<UUID> operadores) {
+            return new DepartmentResponse(d.id(), d.nome(), d.ativo(), d.geral(), operadores);
         }
     }
 

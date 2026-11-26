@@ -104,6 +104,11 @@ final class Fakes {
         public Optional<Atendimento> buscarAbertoDaConversa(UUID conversaId) {
             return dados.values().stream().filter(a -> a.conversaId().equals(conversaId) && a.status().aberto()).findFirst();
         }
+        public Optional<Atendimento> buscarPorId(UUID id) { return Optional.ofNullable(dados.get(id)); }
+        public Optional<Atendimento> buscarUltimoDaConversa(UUID conversaId) {
+            return dados.values().stream().filter(a -> a.conversaId().equals(conversaId))
+                    .max(java.util.Comparator.comparing(Atendimento::abertoEm));
+        }
         public List<Atendimento> listarFinalizados(UUID clienteId, Instant de, Instant ate) {
             return dados.values().stream()
                     .filter(a -> !a.status().aberto() && (clienteId == null || a.clienteId().equals(clienteId)))

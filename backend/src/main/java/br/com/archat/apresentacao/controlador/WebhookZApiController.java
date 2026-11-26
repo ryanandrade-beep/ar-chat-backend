@@ -1,7 +1,9 @@
 package br.com.archat.apresentacao.controlador;
 
 import br.com.archat.aplicacao.atendimento.ReceberMensagemUseCase;
+import br.com.archat.aplicacao.entrega.GerenciarEntregasUseCase;
 import br.com.archat.aplicacao.excecao.NaoAutenticadoException;
+import br.com.archat.dominio.entrega.ItemDeEntrega;
 import br.com.archat.aplicacao.mensagem.AtualizarStatusPeloCanalUseCase;
 import br.com.archat.aplicacao.mensagem.AtualizarStatusPeloCanalUseCase.AvisoDoCanal;
 import br.com.archat.dominio.excecao.RegraDeNegocioException;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -37,7 +40,6 @@ import java.util.UUID;
 @RequestMapping("/webhooks/zapi/{segredo}")
 @Tag(name = "Webhooks Z-API", description = "Chamados pela Z-API; não usam token, e sim o segredo na URL")
 class WebhookZApiController {
-
     private static final Logger log = LoggerFactory.getLogger(WebhookZApiController.class);
 
     private final ReceberMensagemUseCase receber;
@@ -45,10 +47,12 @@ class WebhookZApiController {
     private final byte[] segredo;
 
     private final InstanciaWhatsAppRepositorio instancias;
+    private final GerenciarEntregasUseCase entregas;
 
     WebhookZApiController(ReceberMensagemUseCase receber, AtualizarStatusPeloCanalUseCase atualizarStatus,
                           ArChatPropriedades propriedades,
-                          InstanciaWhatsAppRepositorio instancias) {
+                          InstanciaWhatsAppRepositorio instancias, GerenciarEntregasUseCase entregas) {
+        this.entregas = entregas;
         this.instancias = instancias;
         this.receber = receber;
         this.atualizarStatus = atualizarStatus;
@@ -59,20 +63,49 @@ class WebhookZApiController {
     @Operation(summary = "Ao receber: mensagem enviada por um contato ao número conectado")
     Map<String, Object> recebida(@PathVariable String segredo, @RequestBody RecebidaZApi corpo) {
         validar(segredo);
-        if (Boolean.TRUE.equals(corpo.fromMe()) || !"ReceivedCallback".equals(corpo.type())) {
+        if (Boolean.TRUE.equals(corpo.fromMe()) || !"ReceivedCallback".equals(corpo.type()) || corpo.reaction() != null) {
             return Map.of("ignored", true);
         }
         Instant quando = corpo.momment() == null ? null : Instant.ofEpochMilli(corpo.momment());
         UUID empresa = instancias.buscarPorInstancia(corpo.instanceId()).map(i -> i.clienteId()).orElse(null);
+        var pedido = corpo.pedido();
+        if (pedido != null && empresa != null) {
+            return pedidoDoCatalogo(empresa, corpo, pedido, quando);
+        }
+        var revisao = corpo.revisaoDoPedido();
+        if (revisao != null && empresa != null) {
+            boolean vinculado = entregas.vincularPedidoNativo(empresa, corpo.phone(), revisao.referenceId(),
+                    revisao.orderRequestId());
+            return Map.of("orderLinked", vinculado);
+        }
         boolean registrada = (corpo.contato() != null
-                ? receber.contatoDoCanal(empresa, corpo.phone(), corpo.contato(), corpo.messageId(), quando)
-                : receber.doCanal(empresa, corpo.phone(), corpo.textoOuLegenda(), corpo.midia(), corpo.messageId(), quando))
+                ? receber.contatoDoCanal(empresa, corpo.phone(), corpo.nome(), corpo.contato(), corpo.messageId(), quando)
+                : receber.doCanal(empresa, corpo.phone(), corpo.nome(), corpo.textoOuLegenda(), corpo.midia(), corpo.messageId(), quando))
                 .isPresent();
         if (!registrada) {
-            log.info("Webhook Z-API: mensagem {} de {} ignorada (repetida ou contato não cadastrado)",
-                    corpo.messageId(), corpo.phone());
+            log.info("Webhook Z-API: mensagem {} de {} ignorada ({})", corpo.messageId(), corpo.phone(),
+                    empresa == null ? "instância " + corpo.instanceId() + " não vinculada a nenhuma empresa; vincule no backoffice"
+                            : "repetida ou sem conteúdo");
         }
         return Map.of("registered", registrada);
+    }
+
+    private Map<String, Object> pedidoDoCatalogo(UUID empresa, RecebidaZApi corpo, RecebidaZApi.Pedido pedido, Instant quando) {
+        List<ItemDeEntrega> itens = pedido.itens();
+        BigDecimal total = itens.stream().map(ItemDeEntrega::subtotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+        String resumo = "Pedido pelo catálogo: " + itens.stream().map(i -> i.quantidade() + "x " + i.nome())
+                .collect(java.util.stream.Collectors.joining(", "))
+                + (total.signum() > 0 ? " · Total R$ " + total.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString().replace('.', ',') : "");
+        var fotos = entregas.imagensDosProdutos(empresa, itens.stream().map(ItemDeEntrega::produtoId)
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet()));
+        itens = itens.stream().map(it -> new ItemDeEntrega(it.produtoId(), it.nome(), it.quantidade(), it.valorUnitario(),
+                fotos.get(it.produtoId()))).toList();
+        var mensagem = receber.doCanal(empresa, corpo.phone(), corpo.nome(), resumo, null, corpo.messageId(), quando);
+        if (mensagem.isEmpty() || itens.isEmpty()) {
+            return Map.of("registered", mensagem.isPresent());
+        }
+        entregas.registrarPedidoDoCatalogo(empresa, mensagem.get().conversaId(), itens, resumo, mensagem.get().id());
+        return Map.of("registered", true, "delivery", true);
     }
 
     @PostMapping("/status")
@@ -97,8 +130,44 @@ class WebhookZApiController {
     }
 
     record RecebidaZApi(String instanceId, String type, String messageId, String phone, Boolean fromMe, Boolean isGroup,
-                        Long momment, String senderName, Texto text, Imagem image, Audio audio, Video video,
-                        Documento document, Contato contact) {
+                        Long momment, String senderName, String chatName, Object reaction, Texto text, Imagem image, Audio audio, Video video,
+                        Documento document, Contato contact, PedidoZApi order, RevisaoPedido reviewOrder,
+                        RevisaoPedido reviewAndPay) {
+        Pedido pedido() {
+            if (order == null || order.products() == null) return null;
+            try {
+                return new Pedido(order.products().stream().filter(p -> p.name() != null && p.quantity() != null && p.quantity() > 0)
+                        .map(p -> new ItemDeEntrega(p.productId(), p.name(), p.quantity(), p.valor())).toList());
+            } catch (RegraDeNegocioException e) {
+                return null;
+            }
+        }
+
+        RevisaoPedido revisaoDoPedido() {
+            RevisaoPedido r = reviewOrder != null ? reviewOrder : reviewAndPay;
+            return r == null || r.referenceId() == null || r.orderRequestId() == null ? null : r;
+        }
+
+        record Pedido(List<ItemDeEntrega> itens) {
+        }
+
+        record PedidoZApi(String orderId, List<ProdutoDoPedido> products) {
+        }
+
+        /** O pedido chega com o preço em reais (confirmado com um pedido real: R$ 10 veio como 10); sem preço, valor zero. */
+        record ProdutoDoPedido(String productId, String name, Integer quantity, BigDecimal price, BigDecimal unitPrice) {
+            BigDecimal valor() {
+                BigDecimal bruto = unitPrice != null ? unitPrice : price;
+                return bruto == null ? BigDecimal.ZERO : bruto;
+            }
+        }
+
+        record RevisaoPedido(String referenceId, String orderRequestId) {
+        }
+
+        String nome() {
+            return Boolean.TRUE.equals(isGroup) && chatName != null && !chatName.isBlank() ? chatName : senderName;
+        }
 
         ContatoCompartilhado contato() {
             if (contact == null || contact.phones() == null || contact.phones().isEmpty()) return null;

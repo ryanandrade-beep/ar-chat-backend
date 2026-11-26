@@ -19,7 +19,7 @@ public final class AutenticacaoDtos {
         }
     }
 
-    public record EmailLoginRequest(@NotBlank String email, @NotBlank String password) {
+    public record EmailLoginRequest(@NotBlank String email, @NotBlank String password, String companyDocument) {
     }
 
     public record RegisterRequest(@NotBlank @Size(max = 120) String name, @NotBlank String email,

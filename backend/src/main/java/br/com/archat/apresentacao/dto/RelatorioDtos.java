@@ -25,25 +25,29 @@ public final class RelatorioDtos {
 
     public record AttendanceLine(UUID id, UUID conversationId, String recipient, String startedBy, Instant openedAt,
                                  Instant firstResponseAt, Instant finishedAt, Long firstResponseSeconds,
-                                 Long durationSeconds, int messagesSent, int messagesReceived) {
+                                 Long waitSeconds, Long serviceSeconds, int messagesSent, int messagesReceived,
+                                 UUID departmentId, String closingNote) {
 
         static AttendanceLine de(AtendimentoFinalizado f) {
             var a = f.atendimento();
             return new AttendanceLine(a.id(), a.conversaId(), f.destinatario(),
                     a.origem() == OrigemAtendimento.CLIENTE_FINAL ? "customer" : "company", a.abertoEm(),
                     a.primeiraRespostaEm(), a.finalizadoEm(), a.tempoAtePrimeiraResposta().map(Duration::toSeconds).orElse(null),
-                    a.duracao().map(Duration::toSeconds).orElse(null), a.mensagensEnviadas(), a.mensagensRecebidas());
+                    a.tempoDeEspera().map(Duration::toSeconds).orElse(null),
+                    a.tempoDeAtendimento().map(Duration::toSeconds).orElse(null), a.mensagensEnviadas(), a.mensagensRecebidas(),
+                    f.departamentoId(), a.observacaoDeEncerramento());
         }
     }
 
     public record AttendancesReport(LocalDate from, LocalDate to, long total, long startedByCustomer,
-                                    Long averageFirstResponseSeconds, Long averageDurationSeconds,
+                                    Long averageFirstResponseSeconds, Long averageWaitSeconds, Long averageServiceSeconds,
                                     double averageMessages, Map<LocalDate, Long> perDay, List<AttendanceLine> attendances) {
 
         public static AttendancesReport de(RelatorioAtendimentos r, LocalDate de, LocalDate ate) {
             return new AttendancesReport(de, ate, r.total(), r.iniciadosPeloCliente(),
                     r.tempoMedioPrimeiraResposta() == null ? null : r.tempoMedioPrimeiraResposta().toSeconds(),
-                    r.duracaoMedia() == null ? null : r.duracaoMedia().toSeconds(),
+                    r.esperaMedia() == null ? null : r.esperaMedia().toSeconds(),
+                    r.atendimentoMedio() == null ? null : r.atendimentoMedio().toSeconds(),
                     Math.round(r.mediaMensagens() * 10) / 10.0, r.porDia(),
                     r.atendimentos().stream().map(AttendanceLine::de).toList());
         }

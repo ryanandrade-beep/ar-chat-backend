@@ -1,11 +1,14 @@
 package br.com.archat.infraestrutura.config;
 
+import br.com.archat.aplicacao.integracao.DespacharIntegracoesUseCase;
 import br.com.archat.aplicacao.administrador.GerenciarAdministradoresUseCase;
 import br.com.archat.aplicacao.cliente.ReiniciarConsumoMensalUseCase;
 import br.com.archat.aplicacao.plano.GerenciarPlanosUseCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
+import br.com.archat.aplicacao.campanha.LiberarMensagensAgendadasUseCase;
+import br.com.archat.aplicacao.departamento.GarantirDepartamentoGeralUseCase;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -22,10 +25,17 @@ class TarefasDoSistema implements ApplicationRunner {
     private final ReiniciarConsumoMensalUseCase reiniciarConsumoMensal;
     private final ArChatPropriedades.AdministradorInicial administradorInicial;
     private final GerenciarPlanosUseCase planos;
+    private final LiberarMensagensAgendadasUseCase liberarAgendadas;
+    private final GarantirDepartamentoGeralUseCase garantirGeral;
+    private final DespacharIntegracoesUseCase despacharIntegracoes;
 
     TarefasDoSistema(GerenciarAdministradoresUseCase administradores,
                      ReiniciarConsumoMensalUseCase reiniciarConsumoMensal, ArChatPropriedades propriedades,
-                     GerenciarPlanosUseCase planos) {
+                     GerenciarPlanosUseCase planos, LiberarMensagensAgendadasUseCase liberarAgendadas,
+                     GarantirDepartamentoGeralUseCase garantirGeral, DespacharIntegracoesUseCase despacharIntegracoes) {
+        this.despacharIntegracoes = despacharIntegracoes;
+        this.garantirGeral = garantirGeral;
+        this.liberarAgendadas = liberarAgendadas;
         this.planos = planos;
         this.administradores = administradores;
         this.reiniciarConsumoMensal = reiniciarConsumoMensal;
@@ -34,9 +44,30 @@ class TarefasDoSistema implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments argumentos) {
+        int movidas = garantirGeral.executar();
+        if (movidas > 0) {
+            log.info("{} conversa(s) sem departamento foram para o departamento Geral", movidas);
+        }
         if (administradores.criarInicialSeNecessario(administradorInicial.nome(), administradorInicial.login(),
                 administradorInicial.senha())) {
             log.warn("Administrador inicial '{}' criado; troque a senha padrão em produção", administradorInicial.login());
+        }
+    }
+
+    @Scheduled(fixedDelay = 3000, initialDelay = 5000)
+    void liberarMensagensDeCampanhasAgendadas() {
+        int liberadas = liberarAgendadas.executar();
+        if (liberadas > 0) {
+            log.info("{} mensagem(ns) de campanha liberada(s) para envio", liberadas);
+        }
+    }
+
+    @Scheduled(fixedDelay = 5000, initialDelay = 8000)
+    void enviarAvisosDeIntegracao() {
+        try {
+            despacharIntegracoes.processarPendentes();
+        } catch (RuntimeException e) {
+            log.warn("Falha ao despachar os avisos de integração: {}", e.getMessage());
         }
     }
 

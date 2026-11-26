@@ -10,6 +10,8 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.util.List;
 import java.util.Map;
+import org.slf4j.LoggerFactory;
+
 import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -70,7 +72,13 @@ class ConexaoWhatsAppZApi implements ConexaoWhatsApp {
 
     @Override
     public void enviarAvisoDoSistema(UUID clienteId, String telefone, String texto) {
-        chamar(() -> zapi.enviarTexto(instancias.da(clienteId), EnvioMensagemZApi.comDdi(telefone), texto));
+        try {
+            chamar(() -> zapi.enviarTexto(instancias.da(clienteId), EnvioMensagemZApi.comDdi(telefone), texto));
+        } catch (RuntimeException e) {
+            LoggerFactory.getLogger(ConexaoWhatsAppZApi.class)
+                    .warn("Aviso automático (URA) não enviado para {}: {}", telefone, e.getMessage());
+            throw e;
+        }
     }
 
     @Override

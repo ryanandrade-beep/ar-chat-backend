@@ -19,7 +19,6 @@ import java.util.Map;
 @Component
 @ConditionalOnProperty(name = "archat.envio.provedor", havingValue = "zapi")
 class ClienteZApi {
-
     private final RestClient http;
 
     ClienteZApi(ArChatPropriedades propriedades) {
@@ -35,6 +34,13 @@ class ClienteZApi {
                 .defaultHeader("Client-Token", zapi.clientToken())
                 .requestFactory(fabrica)
                 .build();
+    }
+
+    void registrarWebhooks(Credenciais c, String urlRecebida, String urlStatus) {
+        http.put().uri(c.prefixo() + "/update-webhook-received").contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("value", urlRecebida)).retrieve().toBodilessEntity();
+        http.put().uri(c.prefixo() + "/update-webhook-message-status").contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("value", urlStatus)).retrieve().toBodilessEntity();
     }
 
     RespostaEnvio enviarTexto(Credenciais c, String telefone, String mensagem) {
@@ -102,12 +108,25 @@ class ClienteZApi {
         return contatos == null ? List.of() : List.of(contatos);
     }
 
+    Map<String, Object> catalogo(Credenciais c, String cursor) {
+        Map<String, Object> corpo = cursor == null || cursor.isBlank() ? Map.of() : Map.of("nextCursor", cursor);
+        return http.post().uri(c.prefixo() + "/catalogs").contentType(MediaType.APPLICATION_JSON).body(corpo)
+                .retrieve().body(Map.class);
+    }
+
+    RespostaEnvio enviarPedido(Credenciais c, Map<String, Object> corpo) {
+        return post(c, "/send-order", corpo);
+    }
+
+    RespostaEnvio atualizarStatusDoPedido(Credenciais c, Map<String, Object> corpo) {
+        return post(c, "/order-status-update", corpo);
+    }
+
     void desconectar(Credenciais c) {
         http.get().uri(c.prefixo() + "/disconnect").retrieve().toBodilessEntity();
     }
 
     record Credenciais(String instancia, String token) {
-
         String prefixo() {
             return "/instances/" + instancia + "/token/" + token;
         }

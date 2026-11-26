@@ -7,9 +7,15 @@ import br.com.archat.aplicacao.atendimento.GerenciarAtendimentoUseCase;
 import br.com.archat.aplicacao.atendimento.ReceberMensagemUseCase;
 import br.com.archat.aplicacao.atendimento.RegistroDeAtendimento;
 import br.com.archat.aplicacao.autenticacao.AutenticarAdministradorUseCase;
+import br.com.archat.aplicacao.atendimento.ConsultarHistoricoDoAtendimentoUseCase;
 import br.com.archat.aplicacao.autenticacao.AutenticarClienteUseCase;
 import br.com.archat.aplicacao.campanha.ConsultarCampanhasUseCase;
 import br.com.archat.aplicacao.campanha.DispararCampanhaUseCase;
+import br.com.archat.aplicacao.campanha.LiberarMensagensAgendadasUseCase;
+import br.com.archat.aplicacao.destinatario.GerenciarEtiquetasUseCase;
+import br.com.archat.aplicacao.porta.EnvioDeCampanhas;
+import br.com.archat.aplicacao.porta.EtiquetasDosContatos;
+import br.com.archat.aplicacao.porta.LiberacoesDeMensagens;
 import br.com.archat.aplicacao.canal.ListarCanaisUseCase;
 import br.com.archat.aplicacao.cliente.AtualizarClienteUseCase;
 import br.com.archat.aplicacao.cliente.CadastrarClienteUseCase;
@@ -22,7 +28,20 @@ import br.com.archat.aplicacao.conta.RecuperarSenhaUseCase;
 import br.com.archat.aplicacao.conversa.ConsultarConversasUseCase;
 import br.com.archat.aplicacao.departamento.AtendimentoAutomatico;
 import br.com.archat.aplicacao.departamento.GerenciarDepartamentosUseCase;
+import br.com.archat.aplicacao.departamento.GarantirDepartamentoGeralUseCase;
 import br.com.archat.aplicacao.destinatario.GerenciarDestinatariosUseCase;
+import br.com.archat.aplicacao.entrega.GerenciarEntregasUseCase;
+import br.com.archat.aplicacao.auditoria.ConsultarAuditoriaUseCase;
+import br.com.archat.aplicacao.auditoria.RegistrarAuditoriaUseCase;
+import br.com.archat.aplicacao.integracao.DespacharIntegracoesUseCase;
+import br.com.archat.aplicacao.integracao.GerenciarIntegracaoUseCase;
+import br.com.archat.aplicacao.porta.AuditoriaRepositorio;
+import br.com.archat.aplicacao.porta.CatalogoWhatsApp;
+import br.com.archat.aplicacao.porta.EnvioDeWebhook;
+import br.com.archat.aplicacao.porta.IntegracaoRepositorio;
+import br.com.archat.aplicacao.porta.NotificadorDeIntegracao;
+import br.com.archat.aplicacao.porta.ConexaoWhatsApp;
+import br.com.archat.aplicacao.porta.EntregaRepositorio;
 import br.com.archat.aplicacao.destinatario.ImportarContatosUseCase;
 import br.com.archat.aplicacao.mensagem.AtualizarStatusPeloCanalUseCase;
 import br.com.archat.aplicacao.mensagem.ConfirmarRecebimentoUseCase;
@@ -32,6 +51,8 @@ import br.com.archat.aplicacao.mensagem.ProcessarMensagemUseCase;
 import br.com.archat.aplicacao.mensagem.RecuperarFilaUseCase;
 import br.com.archat.aplicacao.monitoramento.MonitorarFilaUseCase;
 import br.com.archat.aplicacao.operador.ConsultarEquipeUseCase;
+import br.com.archat.aplicacao.operador.GerenciarDepartamentosDoOperadorUseCase;
+import br.com.archat.aplicacao.porta.DepartamentosDosOperadores;
 import br.com.archat.aplicacao.operador.GerenciarOperadoresUseCase;
 import br.com.archat.aplicacao.plano.GerenciarPlanosUseCase;
 import br.com.archat.aplicacao.plano.PlanoDoCliente;
@@ -42,7 +63,6 @@ import br.com.archat.aplicacao.porta.AtendimentoRepositorio;
 import br.com.archat.aplicacao.porta.CampanhaRepositorio;
 import br.com.archat.aplicacao.porta.ClienteRepositorio;
 import br.com.archat.aplicacao.porta.CodificadorSenha;
-import br.com.archat.aplicacao.porta.ConexaoWhatsApp;
 import br.com.archat.aplicacao.porta.ContaDeAcessoRepositorio;
 import br.com.archat.aplicacao.porta.ConversaRepositorio;
 import br.com.archat.aplicacao.porta.DepartamentoRepositorio;
@@ -239,8 +259,9 @@ class CasosDeUsoConfig {
 
     @Bean
     RecuperarFilaUseCase recuperarFila(MensagemRepositorio mensagens, FilaMensagensEmMemoria fila,
-                                       UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio) {
-        return new RecuperarFilaUseCase(mensagens, fila, unidadeDeTrabalho, relogio);
+                                       UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
+                                       LiberacoesDeMensagens liberacoes) {
+        return new RecuperarFilaUseCase(mensagens, fila, unidadeDeTrabalho, relogio, liberacoes);
     }
 
     @Bean
@@ -264,18 +285,45 @@ class CasosDeUsoConfig {
                                                      UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
                                                      MensagemRepositorio mensagens, DestinatarioRepositorio destinatarios,
                                                      ConexaoWhatsApp canal, OperadorRepositorio operadores,
-                                                     DepartamentoRepositorio departamentos) {
+                                                     DepartamentoRepositorio departamentos,
+                                                     NotificadorDeIntegracao integracoes) {
         return new GerenciarAtendimentoUseCase(conversas, atendimentos, unidadeDeTrabalho, relogio, mensagens,
-                destinatarios, canal, operadores, departamentos);
+                destinatarios, canal, operadores, departamentos).comIntegracoes(integracoes);
     }
 
     @Bean
     ReceberMensagemUseCase receberMensagem(DestinatarioRepositorio destinatarios, ConversaRepositorio conversas,
                                            MensagemRepositorio mensagens, RegistroDeAtendimento atendimentos,
                                            UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
-                                           AtendimentoAutomatico ura, ConexaoWhatsApp canal) {
+                                           AtendimentoAutomatico ura, ConexaoWhatsApp canal,
+                                           NotificadorDeIntegracao integracoes) {
         return new ReceberMensagemUseCase(destinatarios, conversas, mensagens, atendimentos, unidadeDeTrabalho, relogio,
-                ura, canal);
+                ura, canal).comIntegracoes(integracoes);
+    }
+
+    @Bean
+    DespacharIntegracoesUseCase despacharIntegracoes(IntegracaoRepositorio integracoes, EnvioDeWebhook webhook, Clock relogio) {
+        return new DespacharIntegracoesUseCase(integracoes, webhook, relogio);
+    }
+
+    @Bean
+    GerenciarIntegracaoUseCase gerenciarIntegracao(IntegracaoRepositorio integracoes, NotificadorDeIntegracao notificador,
+                                                   DespacharIntegracoesUseCase despachar, Clock relogio) {
+        return new GerenciarIntegracaoUseCase(integracoes, notificador, despachar, relogio);
+    }
+
+    @Bean
+    RegistrarAuditoriaUseCase registrarAuditoria(AuditoriaRepositorio auditoria, OperadorRepositorio operadores,
+                                                 ClienteRepositorio clientes, ConversaRepositorio conversas,
+                                                 DestinatarioRepositorio destinatarios, EntregaRepositorio entregas,
+                                                 DepartamentoRepositorio departamentos, Clock relogio) {
+        return new RegistrarAuditoriaUseCase(auditoria, operadores, clientes, conversas, destinatarios, entregas, departamentos,
+                relogio);
+    }
+
+    @Bean
+    ConsultarAuditoriaUseCase consultarAuditoria(AuditoriaRepositorio auditoria, ClienteRepositorio clientes) {
+        return new ConsultarAuditoriaUseCase(auditoria, clientes);
     }
 
     @Bean
@@ -353,13 +401,62 @@ class CasosDeUsoConfig {
                                              ConversaRepositorio conversas, MensagemRepositorio mensagens,
                                              TransacaoRepositorio transacoes, CampanhaRepositorio campanhas,
                                              FilaMensagensEmMemoria fila, UnidadeDeTrabalho unidadeDeTrabalho,
-                                             Clock relogio, PlanoDoCliente planos) {
+                                             Clock relogio, PlanoDoCliente planos, EtiquetasDosContatos etiquetas,
+                                             EnvioDeCampanhas envios, LiberacoesDeMensagens liberacoes) {
         return new DispararCampanhaUseCase(clientes, destinatarios, conversas, mensagens, transacoes, campanhas, fila,
-                unidadeDeTrabalho, relogio, planos);
+                unidadeDeTrabalho, relogio, planos, etiquetas, envios, liberacoes);
     }
 
     @Bean
-    ConsultarCampanhasUseCase consultarCampanhas(CampanhaRepositorio campanhas, MensagemRepositorio mensagens) {
-        return new ConsultarCampanhasUseCase(campanhas, mensagens);
+    LiberarMensagensAgendadasUseCase liberarMensagensAgendadas(LiberacoesDeMensagens liberacoes,
+                                                               MensagemRepositorio mensagens,
+                                                               FilaMensagensEmMemoria fila,
+                                                               UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio) {
+        return new LiberarMensagensAgendadasUseCase(liberacoes, mensagens, fila, unidadeDeTrabalho, relogio);
+    }
+
+    @Bean
+    ConsultarHistoricoDoAtendimentoUseCase consultarHistoricoDoAtendimento(AtendimentoRepositorio atendimentos,
+                                                                           ConversaRepositorio conversas,
+                                                                           DestinatarioRepositorio destinatarios,
+                                                                           MensagemRepositorio mensagens) {
+        return new ConsultarHistoricoDoAtendimentoUseCase(atendimentos, conversas, destinatarios, mensagens);
+    }
+
+    @Bean
+    GerenciarDepartamentosDoOperadorUseCase gerenciarDepartamentosDoOperador(DepartamentosDosOperadores vinculos,
+                                                                             GerenciarOperadoresUseCase operadores,
+                                                                             GerenciarDepartamentosUseCase departamentos,
+                                                                             UnidadeDeTrabalho unidadeDeTrabalho) {
+        return new GerenciarDepartamentosDoOperadorUseCase(vinculos, operadores, departamentos, unidadeDeTrabalho);
+    }
+
+    @Bean
+    GarantirDepartamentoGeralUseCase garantirDepartamentoGeral(ClienteRepositorio clientes, DepartamentoRepositorio departamentos,
+                                                               ConversaRepositorio conversas,
+                                                               UnidadeDeTrabalho unidadeDeTrabalho) {
+        return new GarantirDepartamentoGeralUseCase(clientes, departamentos, conversas, unidadeDeTrabalho);
+    }
+
+    @Bean
+    GerenciarEntregasUseCase gerenciarEntregas(EntregaRepositorio entregas, ConversaRepositorio conversas,
+                                               DestinatarioRepositorio destinatarios, MensagemRepositorio mensagens,
+                                               ConexaoWhatsApp canal, CatalogoWhatsApp catalogo,
+                                               UnidadeDeTrabalho unidadeDeTrabalho, Clock relogio,
+                                               NotificadorDeIntegracao integracoes) {
+        return new GerenciarEntregasUseCase(entregas, conversas, destinatarios, mensagens, canal, catalogo, unidadeDeTrabalho,
+                relogio).comIntegracoes(integracoes);
+    }
+
+    @Bean
+    GerenciarEtiquetasUseCase gerenciarEtiquetas(EtiquetasDosContatos etiquetas, DestinatarioRepositorio destinatarios,
+                                                 UnidadeDeTrabalho unidadeDeTrabalho) {
+        return new GerenciarEtiquetasUseCase(etiquetas, destinatarios, unidadeDeTrabalho);
+    }
+
+    @Bean
+    ConsultarCampanhasUseCase consultarCampanhas(CampanhaRepositorio campanhas, MensagemRepositorio mensagens,
+                                                 EnvioDeCampanhas envios) {
+        return new ConsultarCampanhasUseCase(campanhas, mensagens, envios);
     }
 }

@@ -5,6 +5,7 @@ import br.com.archat.aplicacao.relatorio.Periodo;
 import br.com.archat.aplicacao.relatorio.RelatorioCampanhasUseCase;
 import br.com.archat.aplicacao.relatorio.RelatorioAtendimentosUseCase;
 import br.com.archat.dominio.atendimento.Atendimento;
+import br.com.archat.dominio.atendimento.OrigemAtendimento;
 import br.com.archat.dominio.conversa.Conversa;
 import br.com.archat.dominio.conversa.Destinatario;
 import br.com.archat.aplicacao.relatorio.RelatorioFaturamentoUseCase;
@@ -57,7 +58,7 @@ class RelatoriosTest {
     }
 
     @Test
-    void atendimentosFinalizadosTrazTempoDePrimeiraRespostaEDuracao() {
+    void atendimentosFinalizadosTrazTempoDePrimeiraRespostaEsperaEAtendimento() {
         Cliente mercado = cliente("Mercado", "52998224725");
         Destinatario maria = Destinatario.novo(mercado.id(), "Maria", "44999990000", false);
         destinatarios.salvar(maria);
@@ -79,7 +80,8 @@ class RelatoriosTest {
         assertThat(r.total()).isEqualTo(1);
         assertThat(r.atendimentos().getFirst().destinatario()).isEqualTo("Maria");
         assertThat(r.tempoMedioPrimeiraResposta()).isEqualTo(java.time.Duration.ofMinutes(2));
-        assertThat(r.duracaoMedia()).isEqualTo(java.time.Duration.ofMinutes(10));
+        assertThat(r.esperaMedia()).isEqualTo(java.time.Duration.ofMinutes(2));
+        assertThat(r.atendimentoMedio()).isEqualTo(java.time.Duration.ofMinutes(8));
         assertThat(r.mediaMensagens()).isEqualTo(4.0);
         assertThat(r.porDia()).containsEntry(LocalDate.parse("2026-10-01"), 1L);
     }
@@ -144,5 +146,72 @@ class RelatoriosTest {
 
         assertThat(new RelatorioCampanhasUseCase(campanhas, mensagens)
                 .emitir(mercado.id(), dias("2026-10-01", "2026-10-31")).campanhas()).isEmpty();
+    }
+
+    @Test
+    void atendimentosFiltraPorOperadorOrigemEContato() {
+        Cliente mercado = cliente("Mercado", "52998224725");
+        UUID ana = UUID.randomUUID();
+        Conversa daMaria = conversaFinalizada(mercado, "Maria", "44999990000", ana, true);
+        conversaFinalizada(mercado, "João", "44999990001", null, false);
+        var relatorio = new RelatorioAtendimentosUseCase(atendimentos, conversas, destinatarios, BRASILIA);
+        Periodo outubro = dias("2026-10-01", "2026-10-01");
+
+        assertThat(relatorio.emitir(mercado.id(), outubro).total()).isEqualTo(2);
+        assertThat(relatorio.emitir(mercado.id(), outubro, new RelatorioAtendimentosUseCase.Filtro(ana, null, null))
+                .atendimentos()).extracting(l -> l.atendimento().conversaId()).containsExactly(daMaria.id());
+        assertThat(relatorio.emitir(mercado.id(), outubro,
+                new RelatorioAtendimentosUseCase.Filtro(null, OrigemAtendimento.EMPRESA, null)).atendimentos())
+                .extracting(RelatorioAtendimentosUseCase.AtendimentoFinalizado::destinatario).containsExactly("João");
+        assertThat(relatorio.emitir(mercado.id(), outubro, new RelatorioAtendimentosUseCase.Filtro(null, null, " mar "))
+                .total()).isEqualTo(1);
+    }
+
+    @Test
+    void campanhasFiltraPorPrioridadeConteudoENome() {
+        Cliente mercado = cliente("Mercado", "52998224725");
+        Instant dia = Instant.parse("2026-10-01T13:00:00Z");
+        campanhas.salvar(Campanha.nova(mercado.id(), "Ofertas da semana", "Picanha", Prioridade.NORMAL, 10, dia));
+        campanhas.salvar(Campanha.nova(mercado.id(), "Aviso de pedido", "Pronto", Prioridade.URGENTE, 2, dia));
+        var relatorio = new RelatorioCampanhasUseCase(campanhas, mensagens);
+        Periodo outubro = dias("2026-10-01", "2026-10-01");
+
+        assertThat(relatorio.emitir(mercado.id(), outubro,
+                new RelatorioCampanhasUseCase.Filtro(Prioridade.URGENTE, null, null)).campanhas())
+                .extracting(d -> d.campanha().nome()).containsExactly("Aviso de pedido");
+        assertThat(relatorio.emitir(mercado.id(), outubro, new RelatorioCampanhasUseCase.Filtro(null, true, null))
+                .campanhas()).isEmpty();
+        assertThat(relatorio.emitir(mercado.id(), outubro, new RelatorioCampanhasUseCase.Filtro(null, false, "OFERTAS"))
+                .totalDestinatarios()).isEqualTo(10);
+    }
+
+    @Test
+    void faturamentoFiltraPorNomeDoCliente() {
+        Cliente mercado = cliente("Mercado", "52998224725");
+        Cliente farmacia = cliente("Farmácia", "11144477735");
+        transacao(mercado, TipoTransacao.DEBITO, "0.50", "9.50", "2026-10-01T13:00:00Z");
+        transacao(farmacia, TipoTransacao.DEBITO, "0.25", "4.75", "2026-10-01T13:00:00Z");
+
+        var f = new RelatorioFaturamentoUseCase(clientes, transacoes, mensagens)
+                .emitir(dias("2026-10-01", "2026-10-01"), new RelatorioFaturamentoUseCase.Filtro(TipoPlano.PRE_PAGO, "farm"));
+
+        assertThat(f.clientes()).extracting(RelatorioFaturamentoUseCase.FaturamentoDoCliente::nome)
+                .containsExactly("Farmácia");
+        assertThat(f.receitaLiquida()).isEqualByComparingTo("0.25");
+        assertThat(f.clientes().getFirst().participacao()).isEqualByComparingTo("100.00");
+    }
+
+    private Conversa conversaFinalizada(Cliente cliente, String nome, String telefone, UUID operador, boolean doCliente) {
+        Destinatario contato = Destinatario.novo(cliente.id(), nome, telefone, false);
+        destinatarios.salvar(contato);
+        Conversa conversa = Conversa.iniciar(cliente.id(), contato.id());
+        conversa.atribuirA(operador);
+        conversas.salvar(conversa);
+        Instant inicio = Instant.parse("2026-10-01T13:00:00Z");
+        Atendimento a = doCliente ? Atendimento.abertoPeloClienteFinal(conversa.id(), cliente.id(), inicio)
+                : Atendimento.abertoPelaEmpresa(conversa.id(), cliente.id(), inicio);
+        a.finalizar(inicio.plusSeconds(600));
+        atendimentos.salvar(a);
+        return conversa;
     }
 }

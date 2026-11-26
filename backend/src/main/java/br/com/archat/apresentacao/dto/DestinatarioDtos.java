@@ -14,7 +14,8 @@ public final class DestinatarioDtos {
     }
 
     public record RecipientRequest(String type, @NotBlank @Size(max = 120) String name,
-                                   @NotBlank @Size(max = 40) String phone, Boolean acceptsMarketing) {
+                                   @NotBlank @Size(max = 40) String phone, Boolean acceptsMarketing,
+                                   java.util.List<String> tags) {
 
         public boolean aceitaOfertas() {
             return Boolean.TRUE.equals(acceptsMarketing);
@@ -31,11 +32,16 @@ public final class DestinatarioDtos {
         }
     }
 
-    public record RecipientResponse(UUID id, String type, String name, String phone, boolean acceptsMarketing) {
+    public record RecipientResponse(UUID id, String type, String name, String phone, boolean acceptsMarketing,
+                                    java.util.List<String> tags) {
 
         public static RecipientResponse de(Destinatario d) {
+            return de(d, java.util.List.of());
+        }
+
+        public static RecipientResponse de(Destinatario d, java.util.List<String> etiquetas) {
             return new RecipientResponse(d.id(), d.grupo() ? "group" : "contact", d.nome(), d.telefone(),
-                    d.aceitaOfertas());
+                    d.aceitaOfertas(), etiquetas);
         }
     }
 }

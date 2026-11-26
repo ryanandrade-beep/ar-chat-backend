@@ -26,7 +26,7 @@ class DepartamentoRepositorioJpa implements DepartamentoRepositorio {
 
     @Override
     public void salvar(Departamento d) {
-        departamentos.save(new DepartamentoEntity(d.id(), d.clienteId(), d.nome(), d.ativo(), d.criadoEm()));
+        departamentos.save(new DepartamentoEntity(d.id(), d.clienteId(), d.nome(), d.ativo(), d.criadoEm(), d.geral()));
     }
 
     @Override
@@ -37,6 +37,16 @@ class DepartamentoRepositorioJpa implements DepartamentoRepositorio {
     @Override
     public List<Departamento> listarPorCliente(UUID clienteId) {
         return departamentos.findByClienteId(clienteId).stream().map(DepartamentoRepositorioJpa::paraDominio).toList();
+    }
+
+    @Override
+    public Departamento garantirGeral(UUID clienteId) {
+        return departamentos.findFirstByClienteIdAndGeralTrue(clienteId).map(DepartamentoRepositorioJpa::paraDominio)
+                .orElseGet(() -> {
+                    Departamento geral = Departamento.novoGeral(clienteId, java.time.Instant.now());
+                    salvar(geral);
+                    return geral;
+                });
     }
 
     @Override
@@ -59,6 +69,6 @@ class DepartamentoRepositorioJpa implements DepartamentoRepositorio {
     }
 
     private static Departamento paraDominio(DepartamentoEntity e) {
-        return Departamento.reconstituir(e.getId(), e.getClienteId(), e.getNome(), e.isAtivo(), e.getCriadoEm());
+        return Departamento.reconstituir(e.getId(), e.getClienteId(), e.getNome(), e.isAtivo(), e.getCriadoEm(), e.isGeral());
     }
 }

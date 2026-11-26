@@ -12,9 +12,9 @@ public interface OperadorRepositorio {
 
     Optional<Operador> buscarPorId(UUID id);
 
-    Optional<Operador> buscarPorEmail(String email);
+    List<Operador> listarPorEmail(String email);
 
     List<Operador> listarPorCliente(UUID clienteId);
 
-    boolean existeComEmail(String email);
+    boolean existeComEmailNaEmpresa(UUID clienteId, String email);
 }

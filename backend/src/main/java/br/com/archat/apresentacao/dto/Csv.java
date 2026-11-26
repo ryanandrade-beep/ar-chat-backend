@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,7 +40,8 @@ public final class Csv {
         if (valor == null) {
             return "";
         }
-        String texto = valor instanceof BigDecimal numero ? numero.toPlainString().replace('.', ',') : valor.toString();
+        String texto = valor instanceof BigDecimal numero ? numero.toPlainString().replace('.', ',')
+                : valor instanceof LocalDateTime dataHora ? dataHora.toString().replace('T', ' ') : valor.toString();
         boolean precisaAspas = texto.contains(";") || texto.contains("\"") || texto.contains("\n");
         return precisaAspas ? "\"" + texto.replace("\"", "\"\"") + "\"" : texto;
     }

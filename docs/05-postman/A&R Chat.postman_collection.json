@@ -159,6 +159,10 @@
     {
       "key": "departmentId",
       "value": ""
+    },
+    {
+      "key": "operatorToken",
+      "value": ""
     }
   ],
   "item": [
@@ -291,6 +295,19 @@
             "description": "Cria a conta pela tela \"Criar conta\": plano pré-pago, sem saldo. acceptTerms precisa ser true."
           },
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// CPF válido e aleatório para criar uma conta NOVA a cada execução",
+                  "const n = Array.from({ length: 9 }, () => Math.floor(Math.random() * 10));",
+                  "const dv = (base) => { const s = base.reduce((acc, d, i) => acc + d * (base.length + 1 - i), 0); const r = s % 11; return r < 2 ? 0 : 11 - r; };",
+                  "n.push(dv(n)); n.push(dv(n));",
+                  "pm.collectionVariables.set(\"newDocumentId\", n.join(\"\"));"
+                ]
+              }
+            },
             {
               "listen": "test",
               "script": {
@@ -3182,7 +3199,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{adminToken}}",
+                  "value": "{{clientToken}}",
                   "type": "string"
                 }
               ]
@@ -3230,7 +3247,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{adminToken}}",
+                  "value": "{{clientToken}}",
                   "type": "string"
                 }
               ]
@@ -3243,7 +3260,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                  "pm.test(\"Status 200 ou 502 (WhatsApp desconectado)\", () => pm.expect(pm.response.code).to.be.oneOf([200, 502]));"
                 ]
               }
             }
@@ -3269,7 +3286,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{adminToken}}",
+                  "value": "{{clientToken}}",
                   "type": "string"
                 }
               ]
@@ -3287,35 +3304,6 @@
               }
             }
           ]
-        },
-        {
-          "name": "Desconectar",
-          "request": {
-            "method": "POST",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/whatsapp/disconnect",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "whatsapp",
-                "disconnect"
-              ]
-            },
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "description": "CUIDADO: desconecta o número da Z-API. Fica fora do Runner de propósito — execute manualmente."
-          },
-          "event": []
         }
       ]
     },
@@ -4022,13 +4010,33 @@
                   "bearer": [
                     {
                       "key": "token",
-                      "value": "{{clientToken}}",
+                      "value": "{{operatorToken}}",
                       "type": "string"
                     }
                   ]
                 }
               },
               "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "// Quem participa é um operador da equipe: cria um operador e entra com ele",
+                      "const base = pm.variables.get(\"baseUrl\");",
+                      "const email = \"equipe\" + Date.now() + \"@teste.com\";",
+                      "pm.sendRequest({",
+                      "    url: base + \"/operators\", method: \"POST\",",
+                      "    header: { \"Content-Type\": \"application/json\", Authorization: \"Bearer \" + pm.collectionVariables.get(\"clientToken\") },",
+                      "    body: { mode: \"raw\", raw: JSON.stringify({ name: \"Operador Equipe\", email, password: \"senha12345\" }) }",
+                      "}, () => pm.sendRequest({",
+                      "    url: base + \"/auth/login\", method: \"POST\",",
+                      "    header: { \"Content-Type\": \"application/json\" },",
+                      "    body: { mode: \"raw\", raw: JSON.stringify({ email, password: \"senha12345\" }) }",
+                      "}, (erro, resposta) => pm.collectionVariables.set(\"operatorToken\", resposta.json().token)));"
+                    ]
+                  }
+                },
                 {
                   "listen": "test",
                   "script": {
@@ -4168,7 +4176,7 @@
                   "bearer": [
                     {
                       "key": "token",
-                      "value": "{{clientToken}}",
+                      "value": "{{operatorToken}}",
                       "type": "string"
                     }
                   ]
@@ -4368,13 +4376,13 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/reports/consumption?from=2026-12-31&to=2026-01-01",
+              "raw": "{{baseUrl}}/reports/revenue?from=2026-12-31&to=2026-01-01",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "reports",
-                "consumption"
+                "revenue"
               ],
               "query": [
                 {
@@ -4431,7 +4439,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{adminToken}}",
+                  "value": "{{clientToken}}",
                   "type": "string"
                 }
               ]
@@ -4449,6 +4457,35 @@
               }
             }
           ]
+        },
+        {
+          "name": "Desconectar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/whatsapp/disconnect",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "whatsapp",
+                "disconnect"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{clientToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "CUIDADO: desconecta o número da Z-API. Fica fora do Runner de propósito — execute manualmente."
+          },
+          "event": []
         }
       ],
       "description": "Requisições que afetam o WhatsApp real (enviar para grupo, desconectar). Execute uma a uma, só quando precisar."

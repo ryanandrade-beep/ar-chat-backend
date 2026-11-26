@@ -25,6 +25,8 @@ public class GerenciarAdministradoresUseCase {
         this.unidadeDeTrabalho = unidadeDeTrabalho;
     }
 
+
+
     public List<Administrador> listar() {
         return administradores.listarTodos();
     }
